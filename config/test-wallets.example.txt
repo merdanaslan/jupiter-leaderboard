@@ -1,0 +1,3 @@
+# One Jupiter Perps owner wallet per line.
+# Keep real event wallets in config/test-wallets.local.txt.
+# 11111111111111111111111111111111

@@ -1,0 +1,8 @@
+id,xHandle,displayName,walletAddress,status,mode,startingBalance,startingEquity
+qualifier-01,@summit_alpha,Summit Alpha,MockWallet1111111111111111111111111111111111,active,qualifier,100,100
+qualifier-02,@berlin_beta,Berlin Beta,MockWallet2222222222222222222222222222222222,active,qualifier,100,100
+qualifier-03,@jup_gamma,Jup Gamma,MockWallet3333333333333333333333333333333333,active,qualifier,100,100
+qualifier-04,@perps_delta,Perps Delta,MockWallet4444444444444444444444444444444444,active,qualifier,100,100
+backup-01,@backup_one,Backup One,MockWallet9999999999999999999999999999999999,backup,qualifier,100,100
+final-01,@final_alpha,Final Alpha,MockFinalWallet11111111111111111111111111111111,active,final,1000,1000
+final-02,@final_beta,Final Beta,MockFinalWallet22222222222222222222222222222222,active,final,1000,1000
