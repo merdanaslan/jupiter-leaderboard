@@ -819,7 +819,8 @@ function renderTerminalLeaderboard(input: {
         const snapshot = snapshotsByWallet.get(score.walletAddress);
         const collateralUsd = snapshot?.collateralUsd ?? 0;
         const grossPnlUsd = snapshot?.grossPnlUsd ?? snapshot?.totalPnlUsd ?? score.pnlUsd;
-        const feesUsd = snapshot?.fees?.totalFeesUsd ?? 0;
+        const fees = snapshot?.fees;
+        const feesUsd = fees?.totalFeesUsd ?? 0;
         return {
           rank: score.rank,
           trader: score.xHandle || score.displayName,
@@ -830,6 +831,10 @@ function renderTerminalLeaderboard(input: {
           positionValueUsd: collateralUsd + grossPnlUsd - feesUsd,
           volume: score.volume,
           collateralUsd,
+          leverage: score.openTrade?.sizeUsd && collateralUsd > 0 ? score.openTrade.sizeUsd / collateralUsd : 0,
+          openFeeUsd: fees?.estimatedOpenFeeUsd ?? 0,
+          borrowFeeUsd: fees?.estimatedBorrowFeeUsd ?? 0,
+          closeFeeUsd: fees?.estimatedCloseFeeUsd ?? 0,
           feesUsd,
           grossPnlUsd,
           open: score.openTrade ? formatOpenTrade(score.openTrade) : "--",
@@ -843,9 +848,11 @@ function renderTerminalLeaderboard(input: {
           const collateralUsd = snapshot.collateralUsd ?? snapshot.positions.reduce((sum, position) => sum + position.collateralUsd, 0);
           const equityBase = input.startingEquity ?? collateralUsd;
           const grossPnlUsd = snapshot.grossPnlUsd ?? snapshot.totalPnlUsd;
-          const feesUsd = snapshot.fees?.totalFeesUsd ?? 0;
+          const fees = snapshot.fees;
+          const feesUsd = fees?.totalFeesUsd ?? 0;
           const pnlUsd = snapshot.netPnlUsd ?? grossPnlUsd - feesUsd;
           const positionValueUsd = collateralUsd + grossPnlUsd - feesUsd;
+          const openSizeUsd = snapshot.openTrade?.sizeUsd;
 
           return {
             rank: 0,
@@ -857,6 +864,10 @@ function renderTerminalLeaderboard(input: {
             positionValueUsd,
             volume: snapshot.notionalVolumeUsd,
             collateralUsd,
+            leverage: openSizeUsd && collateralUsd > 0 ? openSizeUsd / collateralUsd : 0,
+            openFeeUsd: fees?.estimatedOpenFeeUsd ?? 0,
+            borrowFeeUsd: fees?.estimatedBorrowFeeUsd ?? 0,
+            closeFeeUsd: fees?.estimatedCloseFeeUsd ?? 0,
             feesUsd,
             grossPnlUsd,
             open: snapshot.openTrade ? formatOpenTrade(snapshot.openTrade) : "--",
@@ -880,7 +891,7 @@ function renderTerminalLeaderboard(input: {
       .filter(Boolean)
       .join(" | "),
   );
-  console.log("".padEnd(168, "-"));
+  console.log("".padEnd(208, "-"));
   console.log(
     [
       pad("Rank", 5),
@@ -891,7 +902,11 @@ function renderTerminalLeaderboard(input: {
       pad("Equity", 13, "left"),
       pad("Volume", 13, "left"),
       pad("Collat", 12, "left"),
-      pad("Fees", 12, "left"),
+      pad("Lev", 7, "left"),
+      pad("OpenFee", 10, "left"),
+      pad("Borrow", 10, "left"),
+      pad("CloseFee", 10, "left"),
+      pad("FeeTot", 10, "left"),
       pad("Gross", 12, "left"),
       pad("Value", 12, "left"),
       pad("Open", 14),
@@ -900,7 +915,7 @@ function renderTerminalLeaderboard(input: {
       pad("Recent", 18),
     ].join(" "),
   );
-  console.log("".padEnd(168, "-"));
+  console.log("".padEnd(208, "-"));
 
   for (const row of rows) {
     console.log(
@@ -913,7 +928,11 @@ function renderTerminalLeaderboard(input: {
         pad(formatUsd(row.equity), 13, "left"),
         pad(formatUsd(row.volume), 13, "left"),
         pad(formatUsd(row.collateralUsd), 12, "left"),
-        pad(formatUsd(row.feesUsd), 12, "left"),
+        pad(formatLeverage(row.leverage), 7, "left"),
+        pad(formatUsd(row.openFeeUsd), 10, "left"),
+        pad(formatUsd(row.borrowFeeUsd), 10, "left"),
+        pad(formatUsd(row.closeFeeUsd), 10, "left"),
+        pad(formatUsd(row.feesUsd), 10, "left"),
         pad(formatSignedUsd(row.grossPnlUsd), 12, "left"),
         pad(formatUsd(row.positionValueUsd), 12, "left"),
         pad(row.open, 14),
@@ -924,7 +943,7 @@ function renderTerminalLeaderboard(input: {
     );
   }
 
-  console.log("".padEnd(168, "-"));
+  console.log("".padEnd(208, "-"));
   console.log("Ctrl+C to stop. Net PnL subtracts parsed/estimated fees; Pos % is gross PnL divided by collateral.");
 }
 
@@ -974,6 +993,14 @@ function formatPrice(value: number): string {
     maximumFractionDigits: value >= 100 ? 2 : 4,
     minimumFractionDigits: value >= 100 ? 2 : 4,
   })}`;
+}
+
+function formatLeverage(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "--";
+  return `${value.toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })}x`;
 }
 
 function formatSigned(value: number): string {
