@@ -42,7 +42,7 @@ function scoreFromSnapshot(input: {
   now: string;
 }): TraderScore {
   const snapshot = input.snapshot;
-  const pnlUsd = Number((snapshot?.totalPnlUsd ?? snapshot?.realizedPnlUsd ?? 0).toFixed(2));
+  const pnlUsd = Number((snapshot?.netPnlUsd ?? snapshot?.totalPnlUsd ?? snapshot?.realizedPnlUsd ?? 0).toFixed(2));
   const equity = Number((input.trader.startingEquity + pnlUsd).toFixed(2));
 
   return {

@@ -187,4 +187,59 @@ describe("Jupiter Perps IDL normalizers", () => {
     expect(snapshot.unrealizedPnlUsd).toBe(100);
     expect(snapshot.totalPnlUsd).toBe(100);
   });
+
+  it("adds current open position size as fallback volume and estimates net PnL fees", () => {
+    const custody = new PublicKey(CUSTODY_BY_MARKET.SOL).toBase58();
+    const snapshot = buildWalletSnapshot({
+      walletAddress: owner.toBase58(),
+      trades: [],
+      positions: [
+        {
+          pubkey: position.toBase58(),
+          owner: owner.toBase58(),
+          custody,
+          market: "SOL",
+          side: "long",
+          sizeUsd: 30,
+          collateralUsd: 10,
+          entryPriceUsd: 100,
+          realisedPnlUsd: 0,
+          cumulativeInterestSnapshot: 0,
+          openTime: 1716400010,
+          updateTime: 1716400020,
+        },
+      ],
+      pricesByMarket: {
+        SOL: 110,
+      },
+      custodyConfigsByAddress: new Map([
+        [
+          custody,
+          {
+            custody,
+            increasePositionBps: 6,
+            decreasePositionBps: 6,
+            cumulativeInterestRate: 0,
+            lastUpdate: 1716400020,
+            minRateBps: 0,
+            maxRateBps: 0,
+            targetRateBps: 0,
+            targetUtilizationRate: 0,
+            assetsOwned: 0,
+            assetsLocked: 0,
+          },
+        ],
+      ]),
+      currentTimeSeconds: 1716400020,
+    });
+
+    expect(snapshot.tradeNotionalVolumeUsd).toBe(0);
+    expect(snapshot.syntheticOpenPositionVolumeUsd).toBe(30);
+    expect(snapshot.notionalVolumeUsd).toBe(30);
+    expect(snapshot.collateralUsd).toBe(10);
+    expect(snapshot.grossPnlUsd).toBe(3);
+    expect(snapshot.fees?.estimatedOpenFeeUsd).toBe(0.018);
+    expect(snapshot.fees?.estimatedCloseFeeUsd).toBe(0.018);
+    expect(snapshot.netPnlUsd).toBe(2.964);
+  });
 });

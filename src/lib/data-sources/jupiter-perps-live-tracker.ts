@@ -5,6 +5,7 @@ import type { JupiterPerpsOraclePrice } from "./jupiter-perps-oracle";
 import type { PricesByMarket } from "./jupiter-perps-pnl";
 import {
   buildWalletSnapshot,
+  type JupiterPerpsCustodyConfig,
   type JupiterPerpsOpenPosition,
   type JupiterPerpsTradeEvent,
   type JupiterPerpsWalletSnapshot,
@@ -36,7 +37,9 @@ export class JupiterPerpsLiveTracker {
   private readonly walletAddresses: string[];
   private readonly positionMapsByWallet = new Map<string, Map<string, JupiterPerpsOpenPosition>>();
   private readonly tradesByWallet = new Map<string, JupiterPerpsTradeEvent[]>();
+  private readonly initialOpenVolumeByWallet = new Map<string, number>();
   private readonly oraclePricesByMarket = new Map<TradeMarket, JupiterPerpsOraclePrice>();
+  private custodyConfigsByAddress = new Map<string, JupiterPerpsCustodyConfig>();
   private pricesByMarket: PricesByMarket | undefined;
 
   constructor(
@@ -128,6 +131,7 @@ export class JupiterPerpsLiveTracker {
       const oraclePrices = await this.client.oracleClient.fetchOraclePrices(this.openMarkets());
       oraclePrices.forEach((oraclePrice) => this.upsertOraclePrice(oraclePrice));
     }
+    this.custodyConfigsByAddress = await this.fetchCustodyConfigsByAddress();
 
     const result = await this.client.fetchWalletSnapshots({
       walletAddresses: this.walletAddresses,
@@ -146,6 +150,7 @@ export class JupiterPerpsLiveTracker {
         }
       }
       this.positionMapsByWallet.set(snapshot.walletAddress, positions);
+      this.initialOpenVolumeByWallet.set(snapshot.walletAddress, snapshot.syntheticOpenPositionVolumeUsd ?? 0);
 
       snapshot.trades.forEach((trade) => this.addTrade(trade));
     }
@@ -209,7 +214,17 @@ export class JupiterPerpsLiveTracker {
       positions: [...(this.positionMapsByWallet.get(walletAddress)?.values() ?? [])],
       trades: this.tradesByWallet.get(walletAddress) ?? [],
       pricesByMarket: this.pricesByMarket,
+      custodyConfigsByAddress: this.custodyConfigsByAddress,
+      syntheticOpenPositionVolumeUsd: this.initialOpenVolumeByWallet.get(walletAddress),
     });
+  }
+
+  private async fetchCustodyConfigsByAddress(): Promise<Map<string, JupiterPerpsCustodyConfig>> {
+    const client = this.client as JupiterPerpsOnChainClient & {
+      fetchCustodyConfigsByAddress?: () => Promise<Map<string, JupiterPerpsCustodyConfig>>;
+    };
+
+    return client.fetchCustodyConfigsByAddress ? client.fetchCustodyConfigsByAddress() : new Map();
   }
 
   private openMarkets(): TradeMarket[] {

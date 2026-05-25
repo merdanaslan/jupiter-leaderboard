@@ -16,9 +16,11 @@ import {
   JUPITER_PERPS_EVENT_AUTHORITY,
   JLP_POOL_ACCOUNT,
   JUPITER_PERPS_PROGRAM_ID,
+  normalizeCustodyConfig,
   normalizeOpenPosition,
   normalizeTradeEvent,
   publicKeyToString,
+  type JupiterPerpsCustodyConfig,
   type DecodedPerpsEvent,
   type JupiterPerpsOpenPosition,
   type JupiterPerpsTradeEvent,
@@ -310,6 +312,7 @@ export class JupiterPerpsOnChainClient {
     const pricesByMarket =
       input.pricesByMarket ??
       (input.includeOraclePrices ? await this.fetchOraclePricesByMarket() : undefined);
+    const custodyConfigsByAddress = await this.fetchCustodyConfigsByAddress();
     const positionsByWallet = [];
     for (const walletAddress of normalizedWallets) {
       positionsByWallet.push({
@@ -338,9 +341,31 @@ export class JupiterPerpsOnChainClient {
           positions,
           trades: tradesByWallet.get(walletAddress) ?? [],
           pricesByMarket,
+          custodyConfigsByAddress,
         }),
       ),
     };
+  }
+
+  async fetchCustodyConfigsByAddress(): Promise<Map<string, JupiterPerpsCustodyConfig>> {
+    const custodyPubkeys = COMPETITION_MARKETS.map((market) => new PublicKey(CUSTODY_BY_MARKET[market]));
+    const accounts = await this.fetchMultipleAccounts(custodyPubkeys);
+    const configs = new Map<string, JupiterPerpsCustodyConfig>();
+
+    accounts.forEach((account, index) => {
+      if (!account || !account.owner.equals(this.programId)) return;
+
+      const pubkey = custodyPubkeys[index].toBase58();
+      configs.set(
+        pubkey,
+        normalizeCustodyConfig(
+          pubkey,
+          this.coder.accounts.decode("Custody", account.data) as Record<string, unknown>,
+        ),
+      );
+    });
+
+    return configs;
   }
 
   async fetchOraclePricesByMarket(): Promise<PricesByMarket> {

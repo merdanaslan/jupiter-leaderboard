@@ -1,7 +1,11 @@
 import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import type { OpenTrade, RecentTrade, TradeMarket, TradeSide } from "../types";
-import { calculateWalletUnrealizedPnlUsd, type PricesByMarket } from "./jupiter-perps-pnl";
+import {
+  calculateWalletFeeSummary,
+  calculateWalletUnrealizedPnlUsd,
+  type PricesByMarket,
+} from "./jupiter-perps-pnl";
 
 export const USDC_DECIMALS = 6;
 
@@ -51,6 +55,9 @@ export interface JupiterPerpsTradeEvent {
   side: TradeSide | "unknown";
   notionalUsd: number;
   feeUsd: number;
+  positionFeeUsd?: number;
+  fundingFeeUsd?: number;
+  priceImpactFeeUsd?: number;
   pnlUsd: number;
   priceUsd: number | null;
   timestamp: string;
@@ -59,23 +66,55 @@ export interface JupiterPerpsTradeEvent {
 export interface JupiterPerpsOpenPosition {
   pubkey: string;
   owner: string;
+  custody?: string;
+  collateralCustody?: string;
   market: TradeMarket | "UNKNOWN";
   side: TradeSide | "unknown";
   sizeUsd: number;
   collateralUsd: number;
   entryPriceUsd: number;
   realisedPnlUsd: number;
+  cumulativeInterestSnapshot?: number;
   openTime: number;
   updateTime: number;
+}
+
+export interface JupiterPerpsCustodyConfig {
+  custody: string;
+  increasePositionBps: number;
+  decreasePositionBps: number;
+  cumulativeInterestRate: number;
+  lastUpdate: number;
+  minRateBps: number;
+  maxRateBps: number;
+  targetRateBps: number;
+  targetUtilizationRate: number;
+  assetsOwned: number;
+  assetsLocked: number;
+}
+
+export interface JupiterPerpsFeeSummary {
+  eventFeeUsd: number;
+  estimatedOpenFeeUsd: number;
+  estimatedCloseFeeUsd: number;
+  estimatedBorrowFeeUsd: number;
+  totalFeesUsd: number;
 }
 
 export interface JupiterPerpsWalletSnapshot {
   walletAddress: string;
   positions: JupiterPerpsOpenPosition[];
   trades: JupiterPerpsTradeEvent[];
+  tradeNotionalVolumeUsd?: number;
+  openPositionNotionalUsd?: number;
+  syntheticOpenPositionVolumeUsd?: number;
+  collateralUsd?: number;
+  fees?: JupiterPerpsFeeSummary;
   notionalVolumeUsd: number;
   realizedPnlUsd: number;
   unrealizedPnlUsd: number;
+  grossPnlUsd?: number;
+  netPnlUsd?: number;
   totalPnlUsd: number;
   recentTrade?: RecentTrade;
   openTrade?: OpenTrade;
@@ -88,6 +127,17 @@ export function bnToNumber(value: unknown, decimals = USDC_DECIMALS): number {
   if (typeof value === "string") return Number(value) / 10 ** decimals;
   if (value && typeof value === "object" && "toString" in value) {
     return Number(value.toString()) / 10 ** decimals;
+  }
+  return 0;
+}
+
+export function bnToRawNumber(value: unknown): number {
+  if (BN.isBN(value)) return Number((value as BN).toString());
+  if (typeof value === "bigint") return Number(value);
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  if (value && typeof value === "object" && "toString" in value) {
+    return Number(value.toString());
   }
   return 0;
 }
@@ -128,14 +178,37 @@ export function normalizeOpenPosition(pubkey: string, account: Record<string, un
   return {
     pubkey,
     owner: publicKeyToString(account.owner),
+    custody: publicKeyToString(account.custody),
+    collateralCustody: publicKeyToString(account.collateralCustody),
     market: marketFromCustody(account.custody),
     side: sideToString(account.side),
     sizeUsd: bnToNumber(account.sizeUsd),
     collateralUsd: bnToNumber(account.collateralUsd),
     entryPriceUsd: bnToNumber(account.price),
     realisedPnlUsd: bnToNumber(account.realisedPnlUsd),
+    cumulativeInterestSnapshot: bnToRawNumber(account.cumulativeInterestSnapshot),
     openTime: Number(account.openTime?.toString?.() ?? account.openTime ?? 0),
     updateTime: Number(account.updateTime?.toString?.() ?? account.updateTime ?? 0),
+  };
+}
+
+export function normalizeCustodyConfig(pubkey: string, account: Record<string, unknown>): JupiterPerpsCustodyConfig {
+  const fundingRateState = (account.fundingRateState ?? {}) as Record<string, unknown>;
+  const jumpRateState = (account.jumpRateState ?? {}) as Record<string, unknown>;
+  const assets = (account.assets ?? {}) as Record<string, unknown>;
+
+  return {
+    custody: pubkey,
+    increasePositionBps: bnToRawNumber(account.increasePositionBps),
+    decreasePositionBps: bnToRawNumber(account.decreasePositionBps),
+    cumulativeInterestRate: bnToRawNumber(fundingRateState.cumulativeInterestRate),
+    lastUpdate: bnToRawNumber(fundingRateState.lastUpdate),
+    minRateBps: bnToRawNumber(jumpRateState.minRateBps),
+    maxRateBps: bnToRawNumber(jumpRateState.maxRateBps),
+    targetRateBps: bnToRawNumber(jumpRateState.targetRateBps),
+    targetUtilizationRate: bnToRawNumber(jumpRateState.targetUtilizationRate),
+    assetsOwned: bnToRawNumber(assets.owned),
+    assetsLocked: bnToRawNumber(assets.locked),
   };
 }
 
@@ -168,6 +241,9 @@ export function normalizeTradeEvent(event: DecodedPerpsEvent): JupiterPerpsTrade
     side: sideByteToString(data.positionSide),
     notionalUsd: bnToNumber(data.sizeUsdDelta),
     feeUsd: bnToNumber(data.feeUsd),
+    positionFeeUsd: bnToNumber(data.positionFeeUsd),
+    fundingFeeUsd: bnToNumber(data.fundingFeeUsd),
+    priceImpactFeeUsd: bnToNumber(data.priceImpactFeeUsd),
     pnlUsd,
     priceUsd: "price" in data ? bnToNumber(data.price) : null,
     timestamp: timestampSeconds > 0 ? new Date(timestampSeconds * 1000).toISOString() : new Date(0).toISOString(),
@@ -179,10 +255,34 @@ export function buildWalletSnapshot(input: {
   positions: JupiterPerpsOpenPosition[];
   trades: JupiterPerpsTradeEvent[];
   pricesByMarket?: PricesByMarket;
+  custodyConfigsByAddress?: Map<string, JupiterPerpsCustodyConfig>;
+  syntheticOpenPositionVolumeUsd?: number;
+  currentTimeSeconds?: number;
 }): JupiterPerpsWalletSnapshot {
-  const notionalVolumeUsd = input.trades.reduce((sum, trade) => sum + Math.abs(trade.notionalUsd), 0);
+  const tradeNotionalVolumeUsd = input.trades.reduce((sum, trade) => sum + Math.abs(trade.notionalUsd), 0);
+  const positionsWithIncreaseTrade = new Set(
+    input.trades
+      .filter((trade) => trade.name.includes("Increase"))
+      .map((trade) => trade.position),
+  );
+  const inferredOpenPositionVolumeUsd =
+    input.syntheticOpenPositionVolumeUsd ??
+    input.positions
+      .filter((position) => !positionsWithIncreaseTrade.has(position.pubkey))
+      .reduce((sum, position) => sum + Math.abs(position.sizeUsd), 0);
+  const openPositionNotionalUsd = input.positions.reduce((sum, position) => sum + Math.abs(position.sizeUsd), 0);
+  const collateralUsd = input.positions.reduce((sum, position) => sum + position.collateralUsd, 0);
+  const notionalVolumeUsd = tradeNotionalVolumeUsd + inferredOpenPositionVolumeUsd;
   const realizedPnlUsd = input.trades.reduce((sum, trade) => sum + trade.pnlUsd, 0);
   const unrealizedPnlUsd = calculateWalletUnrealizedPnlUsd(input.positions, input.pricesByMarket);
+  const fees = calculateWalletFeeSummary({
+    positions: input.positions,
+    trades: input.trades,
+    custodyConfigsByAddress: input.custodyConfigsByAddress,
+    currentTimeSeconds: input.currentTimeSeconds,
+  });
+  const grossPnlUsd = realizedPnlUsd + unrealizedPnlUsd;
+  const netPnlUsd = grossPnlUsd - fees.totalFeesUsd;
   const latestTrade = input.trades.at(0);
   const largestPosition = [...input.positions].sort((a, b) => b.sizeUsd - a.sizeUsd)[0];
 
@@ -190,10 +290,17 @@ export function buildWalletSnapshot(input: {
     walletAddress: input.walletAddress,
     positions: input.positions,
     trades: input.trades,
+    tradeNotionalVolumeUsd,
+    openPositionNotionalUsd,
+    syntheticOpenPositionVolumeUsd: inferredOpenPositionVolumeUsd,
+    collateralUsd,
+    fees,
     notionalVolumeUsd,
     realizedPnlUsd,
     unrealizedPnlUsd,
-    totalPnlUsd: realizedPnlUsd + unrealizedPnlUsd,
+    grossPnlUsd,
+    netPnlUsd,
+    totalPnlUsd: grossPnlUsd,
     recentTrade: latestTrade && latestTrade.market !== "UNKNOWN" && latestTrade.side !== "unknown"
       ? {
           market: latestTrade.market,

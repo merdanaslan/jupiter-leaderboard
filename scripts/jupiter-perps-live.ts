@@ -813,32 +813,52 @@ function renderTerminalLeaderboard(input: {
   startingEquity?: number;
   equityBasis: string;
 }) {
+  const snapshotsByWallet = new Map(input.update.snapshots.map((snapshot) => [snapshot.walletAddress, snapshot]));
   const rows = input.scores
-    ? input.scores.map((score) => ({
-        rank: score.rank,
-        trader: score.xHandle || score.displayName,
-        pnlUsd: score.pnlUsd,
-        pnlPercent: score.pnlPercent,
-        equity: score.equity,
-        volume: score.volume,
-        open: score.openTrade ? formatOpenTrade(score.openTrade) : "--",
-        sizeUsd: score.openTrade?.sizeUsd,
-        entryPrice: score.openTrade?.entryPrice,
-        recent: score.recentTrade ? formatRecentTrade(score.recentTrade) : "--",
-      }))
+    ? input.scores.map((score) => {
+        const snapshot = snapshotsByWallet.get(score.walletAddress);
+        const collateralUsd = snapshot?.collateralUsd ?? 0;
+        const grossPnlUsd = snapshot?.grossPnlUsd ?? snapshot?.totalPnlUsd ?? score.pnlUsd;
+        const feesUsd = snapshot?.fees?.totalFeesUsd ?? 0;
+        return {
+          rank: score.rank,
+          trader: score.xHandle || score.displayName,
+          pnlUsd: score.pnlUsd,
+          pnlPercent: score.pnlPercent,
+          positionPnlPercent: collateralUsd > 0 ? (grossPnlUsd / collateralUsd) * 100 : 0,
+          equity: score.equity,
+          positionValueUsd: collateralUsd + grossPnlUsd - feesUsd,
+          volume: score.volume,
+          collateralUsd,
+          feesUsd,
+          grossPnlUsd,
+          open: score.openTrade ? formatOpenTrade(score.openTrade) : "--",
+          sizeUsd: score.openTrade?.sizeUsd,
+          entryPrice: score.openTrade?.entryPrice,
+          recent: score.recentTrade ? formatRecentTrade(score.recentTrade) : "--",
+        };
+      })
     : input.update.snapshots
         .map((snapshot) => {
-          const collateralUsd = snapshot.positions.reduce((sum, position) => sum + position.collateralUsd, 0);
+          const collateralUsd = snapshot.collateralUsd ?? snapshot.positions.reduce((sum, position) => sum + position.collateralUsd, 0);
           const equityBase = input.startingEquity ?? collateralUsd;
-          const pnlUsd = snapshot.totalPnlUsd;
+          const grossPnlUsd = snapshot.grossPnlUsd ?? snapshot.totalPnlUsd;
+          const feesUsd = snapshot.fees?.totalFeesUsd ?? 0;
+          const pnlUsd = snapshot.netPnlUsd ?? grossPnlUsd - feesUsd;
+          const positionValueUsd = collateralUsd + grossPnlUsd - feesUsd;
 
           return {
             rank: 0,
             trader: shortAddress(snapshot.walletAddress),
             pnlUsd,
             pnlPercent: equityBase > 0 ? (pnlUsd / equityBase) * 100 : 0,
-            equity: Number((equityBase + pnlUsd).toFixed(2)),
+            positionPnlPercent: collateralUsd > 0 ? (grossPnlUsd / collateralUsd) * 100 : 0,
+            equity: Number(((input.startingEquity ?? 0) > 0 ? equityBase + pnlUsd : positionValueUsd).toFixed(2)),
+            positionValueUsd,
             volume: snapshot.notionalVolumeUsd,
+            collateralUsd,
+            feesUsd,
+            grossPnlUsd,
             open: snapshot.openTrade ? formatOpenTrade(snapshot.openTrade) : "--",
             sizeUsd: snapshot.openTrade?.sizeUsd,
             entryPrice: snapshot.openTrade?.entryPrice,
@@ -860,22 +880,27 @@ function renderTerminalLeaderboard(input: {
       .filter(Boolean)
       .join(" | "),
   );
-  console.log("".padEnd(126, "-"));
+  console.log("".padEnd(168, "-"));
   console.log(
     [
       pad("Rank", 5),
       pad("Trader", 18),
-      pad("PnL", 13, "left"),
-      pad("PnL %", 10, "left"),
+      pad("Net PnL", 13, "left"),
+      pad("Cup %", 10, "left"),
+      pad("Pos %", 10, "left"),
       pad("Equity", 13, "left"),
       pad("Volume", 13, "left"),
+      pad("Collat", 12, "left"),
+      pad("Fees", 12, "left"),
+      pad("Gross", 12, "left"),
+      pad("Value", 12, "left"),
       pad("Open", 14),
       pad("Size", 12, "left"),
       pad("Entry", 10, "left"),
       pad("Recent", 18),
     ].join(" "),
   );
-  console.log("".padEnd(126, "-"));
+  console.log("".padEnd(168, "-"));
 
   for (const row of rows) {
     console.log(
@@ -884,8 +909,13 @@ function renderTerminalLeaderboard(input: {
         pad(row.trader, 18),
         pad(formatSignedUsd(row.pnlUsd), 13, "left"),
         pad(formatPercent(row.pnlPercent), 10, "left"),
+        pad(formatPercent(row.positionPnlPercent), 10, "left"),
         pad(formatUsd(row.equity), 13, "left"),
         pad(formatUsd(row.volume), 13, "left"),
+        pad(formatUsd(row.collateralUsd), 12, "left"),
+        pad(formatUsd(row.feesUsd), 12, "left"),
+        pad(formatSignedUsd(row.grossPnlUsd), 12, "left"),
+        pad(formatUsd(row.positionValueUsd), 12, "left"),
         pad(row.open, 14),
         pad(row.sizeUsd === undefined ? "--" : formatUsd(row.sizeUsd), 12, "left"),
         pad(row.entryPrice === undefined ? "--" : formatPrice(row.entryPrice), 10, "left"),
@@ -894,8 +924,8 @@ function renderTerminalLeaderboard(input: {
     );
   }
 
-  console.log("".padEnd(126, "-"));
-  console.log("Ctrl+C to stop. Add --trader-config-file for X handles and competition starting equity.");
+  console.log("".padEnd(168, "-"));
+  console.log("Ctrl+C to stop. Net PnL subtracts parsed/estimated fees; Pos % is gross PnL divided by collateral.");
 }
 
 function formatOpenTrade(trade: NonNullable<TraderScore["openTrade"]>): string {
