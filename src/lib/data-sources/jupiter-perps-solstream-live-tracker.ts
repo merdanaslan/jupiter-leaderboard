@@ -8,7 +8,9 @@ import {
   buildWalletSnapshot,
   type JupiterPerpsCustodyConfig,
   type JupiterPerpsOpenPosition,
+  type JupiterPerpsPositionRequestEvent,
   type JupiterPerpsTradeEvent,
+  type JupiterPerpsTriggerOrder,
   type JupiterPerpsWalletSnapshot,
 } from "./jupiter-perps-normalize";
 import type { SolstreamSubscription } from "./solstream-client";
@@ -23,7 +25,7 @@ export interface JupiterPerpsSolstreamLiveTrackerOptions {
   onError?: (error: Error) => void;
 }
 
-export type JupiterPerpsSolstreamLiveUpdateReason = "initial" | "trade" | "position" | "oracle";
+export type JupiterPerpsSolstreamLiveUpdateReason = "initial" | "trade" | "position" | "trigger-order" | "oracle";
 
 export interface JupiterPerpsSolstreamLiveUpdate {
   reason: JupiterPerpsSolstreamLiveUpdateReason;
@@ -33,13 +35,19 @@ export interface JupiterPerpsSolstreamLiveUpdate {
   snapshots: JupiterPerpsWalletSnapshot[];
   trade?: JupiterPerpsTradeEvent;
   position?: JupiterPerpsOpenPosition;
+  triggerOrder?: JupiterPerpsTriggerOrder;
+  triggerOrderPubkey?: string;
+  triggerOrderRemoved?: boolean;
+  positionRequestEvent?: JupiterPerpsPositionRequestEvent;
   oraclePrice?: JupiterPerpsOraclePrice;
   slot?: number;
 }
 
 interface SolstreamAdapterLike {
   subscribeWalletTrades: JupiterPerpsSolstreamAdapter["subscribeWalletTrades"];
+  subscribeWalletEvents?: JupiterPerpsSolstreamAdapter["subscribeWalletEvents"];
   subscribePositionAccounts: JupiterPerpsSolstreamAdapter["subscribePositionAccounts"];
+  subscribePositionRequestAccounts?: JupiterPerpsSolstreamAdapter["subscribePositionRequestAccounts"];
   subscribeOraclePrices: JupiterPerpsSolstreamAdapter["subscribeOraclePrices"];
 }
 
@@ -47,6 +55,8 @@ export class JupiterPerpsSolstreamLiveTracker {
   private readonly walletAddresses: string[];
   private readonly positionMapsByWallet = new Map<string, Map<string, JupiterPerpsOpenPosition>>();
   private readonly tradesByWallet = new Map<string, JupiterPerpsTradeEvent[]>();
+  private readonly triggerOrdersByWallet = new Map<string, JupiterPerpsTriggerOrder[]>();
+  private readonly triggerOrdersUnavailableByWallet = new Map<string, boolean>();
   private readonly initialOpenVolumeByWallet = new Map<string, number>();
   private readonly oraclePricesByMarket = new Map<TradeMarket, JupiterPerpsOraclePrice>();
   private custodyConfigsByAddress = new Map<string, JupiterPerpsCustodyConfig>();
@@ -61,6 +71,8 @@ export class JupiterPerpsSolstreamLiveTracker {
     this.walletAddresses.forEach((walletAddress) => {
       this.positionMapsByWallet.set(walletAddress, new Map());
       this.tradesByWallet.set(walletAddress, []);
+      this.triggerOrdersByWallet.set(walletAddress, []);
+      this.triggerOrdersUnavailableByWallet.set(walletAddress, false);
     });
   }
 
@@ -68,26 +80,61 @@ export class JupiterPerpsSolstreamLiveTracker {
     let initialized = false;
     const subscriptions: SolstreamSubscription[] = [];
     const handleError = (error: Error) => this.options.onError?.(error);
+    const handleTradeUpdate = (update: { trade: JupiterPerpsTradeEvent; slot: number }) => {
+      this.addTrade(update.trade);
+      if (!initialized) return;
+      onUpdate(
+        this.buildUpdate({
+          reason: "trade",
+          walletAddress: update.trade.owner,
+          trade: update.trade,
+          slot: update.slot,
+        }),
+      );
+    };
+    const handlePositionRequestEventUpdate = (update: { request: JupiterPerpsPositionRequestEvent; slot: number }) => {
+      if (update.request.action !== "close") return;
 
-    subscriptions.push(
-      this.adapter.subscribeWalletTrades(
-        this.walletAddresses,
-        (update) => {
-          this.addTrade(update.trade);
-          if (!initialized) return;
-          onUpdate(
-            this.buildUpdate({
-              reason: "trade",
-              walletAddress: update.trade.owner,
-              trade: update.trade,
-              slot: update.slot,
-            }),
-          );
-        },
-        handleError,
-        { fromSlot: this.options.fromSlot },
-      ),
-    );
+      const walletAddress = this.removeTriggerOrder(update.request.positionRequestKey) ?? update.request.owner;
+      if (!initialized) return;
+      onUpdate(
+        this.buildUpdate({
+          reason: "trigger-order",
+          walletAddress,
+          triggerOrderPubkey: update.request.positionRequestKey,
+          triggerOrderRemoved: true,
+          positionRequestEvent: update.request,
+          slot: update.slot,
+        }),
+      );
+    };
+
+    if (this.adapter.subscribeWalletEvents) {
+      subscriptions.push(
+        this.adapter.subscribeWalletEvents(
+          this.walletAddresses,
+          (update) => {
+            if (update.kind === "trade") {
+              handleTradeUpdate(update);
+              return;
+            }
+
+            handlePositionRequestEventUpdate(update);
+          },
+          handleError,
+          { fromSlot: this.options.fromSlot },
+        ),
+      );
+    } else {
+      subscriptions.push(
+        this.adapter.subscribeWalletTrades(
+          this.walletAddresses,
+          handleTradeUpdate,
+          handleError,
+          { fromSlot: this.options.fromSlot },
+        ),
+      );
+    }
 
     subscriptions.push(
       this.adapter.subscribePositionAccounts(
@@ -108,6 +155,34 @@ export class JupiterPerpsSolstreamLiveTracker {
         { fromSlot: this.options.fromSlot },
       ),
     );
+
+    if (this.adapter.subscribePositionRequestAccounts) {
+      subscriptions.push(
+        this.adapter.subscribePositionRequestAccounts(
+          this.walletAddresses,
+          (update) => {
+            const walletAddress = update.order
+              ? this.upsertTriggerOrder(update.order)
+              : update.removed
+                ? this.removeTriggerOrder(update.pubkey)
+                : undefined;
+            if (!initialized) return;
+            onUpdate(
+              this.buildUpdate({
+                reason: "trigger-order",
+                walletAddress,
+                triggerOrder: update.order,
+                triggerOrderPubkey: update.pubkey,
+                triggerOrderRemoved: update.removed,
+                slot: update.slot,
+              }),
+            );
+          },
+          handleError,
+          { fromSlot: this.options.fromSlot },
+        ),
+      );
+    }
 
     if (this.options.includeOraclePrices !== false) {
       subscriptions.push(
@@ -172,6 +247,14 @@ export class JupiterPerpsSolstreamLiveTracker {
         }
       }
       this.positionMapsByWallet.set(snapshot.walletAddress, positions);
+      this.triggerOrdersByWallet.set(
+        snapshot.walletAddress,
+        mergeTriggerOrders(this.triggerOrdersByWallet.get(snapshot.walletAddress) ?? [], snapshot.triggerOrders ?? []),
+      );
+      this.triggerOrdersUnavailableByWallet.set(
+        snapshot.walletAddress,
+        snapshot.triggerOrdersUnavailable === true && (this.triggerOrdersByWallet.get(snapshot.walletAddress)?.length ?? 0) === 0,
+      );
       this.initialOpenVolumeByWallet.set(snapshot.walletAddress, snapshot.syntheticOpenPositionVolumeUsd ?? 0);
 
       snapshot.trades.forEach((trade) => this.addTrade(trade));
@@ -199,6 +282,28 @@ export class JupiterPerpsSolstreamLiveTracker {
     positions.set(position.pubkey, position);
   }
 
+  private upsertTriggerOrder(order: JupiterPerpsTriggerOrder): string {
+    const current = this.triggerOrdersByWallet.get(order.owner) ?? [];
+    this.triggerOrdersByWallet.set(order.owner, mergeTriggerOrders(current, [order]));
+    this.triggerOrdersUnavailableByWallet.set(order.owner, false);
+    return order.owner;
+  }
+
+  private removeTriggerOrder(pubkey: string): string | undefined {
+    let removedWallet: string | undefined;
+
+    for (const [walletAddress, orders] of this.triggerOrdersByWallet.entries()) {
+      const nextOrders = orders.filter((order) => order.pubkey !== pubkey);
+      if (nextOrders.length === orders.length) continue;
+
+      this.triggerOrdersByWallet.set(walletAddress, nextOrders);
+      this.triggerOrdersUnavailableByWallet.set(walletAddress, false);
+      removedWallet ??= walletAddress;
+    }
+
+    return removedWallet;
+  }
+
   private upsertOraclePrice(oraclePrice: JupiterPerpsOraclePrice): void {
     const current = this.oraclePricesByMarket.get(oraclePrice.market);
     if (current && current.timestamp > oraclePrice.timestamp) return;
@@ -214,6 +319,10 @@ export class JupiterPerpsSolstreamLiveTracker {
     walletAddress?: string;
     trade?: JupiterPerpsTradeEvent;
     position?: JupiterPerpsOpenPosition;
+    triggerOrder?: JupiterPerpsTriggerOrder;
+    triggerOrderPubkey?: string;
+    triggerOrderRemoved?: boolean;
+    positionRequestEvent?: JupiterPerpsPositionRequestEvent;
     oraclePrice?: JupiterPerpsOraclePrice;
     slot?: number;
   }): JupiterPerpsSolstreamLiveUpdate {
@@ -227,6 +336,10 @@ export class JupiterPerpsSolstreamLiveTracker {
       snapshots: this.getSnapshots(),
       trade: input.trade,
       position: input.position,
+      triggerOrder: input.triggerOrder,
+      triggerOrderPubkey: input.triggerOrderPubkey,
+      triggerOrderRemoved: input.triggerOrderRemoved,
+      positionRequestEvent: input.positionRequestEvent,
       oraclePrice: input.oraclePrice,
       slot: input.slot,
     };
@@ -237,6 +350,8 @@ export class JupiterPerpsSolstreamLiveTracker {
       walletAddress,
       positions: [...(this.positionMapsByWallet.get(walletAddress)?.values() ?? [])],
       trades: this.tradesByWallet.get(walletAddress) ?? [],
+      triggerOrders: this.triggerOrdersByWallet.get(walletAddress) ?? [],
+      triggerOrdersUnavailable: this.triggerOrdersUnavailableByWallet.get(walletAddress),
       pricesByMarket: this.pricesByMarket,
       custodyConfigsByAddress: this.custodyConfigsByAddress,
       syntheticOpenPositionVolumeUsd: this.initialOpenVolumeByWallet.get(walletAddress),
@@ -261,4 +376,19 @@ export class JupiterPerpsSolstreamLiveTracker {
 
     return markets.size ? [...markets] : ["SOL", "ETH", "BTC"];
   }
+}
+
+function mergeTriggerOrders(
+  current: JupiterPerpsTriggerOrder[],
+  next: JupiterPerpsTriggerOrder[],
+): JupiterPerpsTriggerOrder[] {
+  const byPubkey = new Map(current.map((order) => [order.pubkey, order]));
+  for (const order of next) {
+    const existing = byPubkey.get(order.pubkey);
+    if (!existing || order.updateTime >= existing.updateTime) {
+      byPubkey.set(order.pubkey, order);
+    }
+  }
+
+  return [...byPubkey.values()].sort((a, b) => a.triggerPriceUsd - b.triggerPriceUsd || a.counter - b.counter);
 }

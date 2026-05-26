@@ -32,6 +32,7 @@ The real-data path is built around on-chain Jupiter Perps account/event parsing 
 
 ```bash
 SOLANA_RPC_URL=
+SOLANA_BACKFILL_RPC_URL=
 SOLANA_GRPC_URL=
 SOLANA_GRPC_API_KEY=
 SOLANA_STREAM_URL=
@@ -43,6 +44,7 @@ The current adapter can:
 - parse Jupiter Perps Anchor CPI trade events from the program event authority
 - subscribe to new event-authority logs over WebSocket, fetch confirmed transactions, and filter parsed trade events to whitelisted wallets
 - subscribe to Solstream gRPC account and transaction streams for live derived Position updates and Jupiter Perps trade events
+- backfill already-created TP/SL request accounts from recent wallet request events using `SOLANA_BACKFILL_RPC_URL`, or a temporary public fallback while a dedicated history RPC is not configured
 - compute round notional volume from parsed increase/decrease/liquidation events
 - compute event-derived realized PnL and expose open-position hints for validation
 
@@ -106,9 +108,11 @@ The adapter includes the Doves oracle accounts and the position PnL formula from
 
 The gRPC path uses `SOLANA_GRPC_URL` and optional `SOLANA_GRPC_API_KEY`. It vendors the Solstream protobuf definition and keeps the parser source-of-truth in the Jupiter Perps Anchor IDL. Trade streaming subscribes to Jupiter Perps event-authority transactions, decodes Anchor events, and then filters by the whitelisted event owner instead of relying on the wallet being a required transaction account. Use `jupiter:grpc-watch` for combined live wallet snapshots from Solstream trades, derived Position account updates, and Doves oracle updates.
 
+`SOLANA_BACKFILL_RPC_URL` is optional but recommended when the primary live RPC does not support transaction history or broad program account scans. Until a dedicated history-capable RPC is configured, the adapter falls back to `https://solana-rpc.publicnode.com` for this narrow backfill path. The live tracker can use Solstice for gRPC/live account updates while using the backfill RPC only to find recent wallet TP/SL request keys, then it fetches the known request accounts directly.
+
 When `jupiter:grpc-watch` is run with `--trader-config-file` and `--public-scores`, it maps the live IDL-derived wallet snapshots into ranked trader scores and omits wallet addresses from the emitted leaderboard payload. If no `--wallet` or `--wallet-file` is provided, the watcher derives its wallet filter from active traders in the config file and optional `--mode`.
 
-For CLI validation, use `--terminal-leaderboard` with `jupiter:grpc-watch` to render a readable live table with rank, trader, net PnL, competition PnL %, position PnL %, equity, volume, collateral, leverage, estimated open/borrow/close fees, gross PnL, current position value, open trade, size, entry price, and latest parsed trade. With `--trader-config-file`, trader names and starting equity come from the CSV. Without config, add `--starting-equity` to test a single wallet against a competition-style starting equity; otherwise equity is estimated from open-position collateral plus PnL and fees.
+For CLI validation, use `--terminal-leaderboard` with `jupiter:grpc-watch` to render a readable live table with rank, trader, net PnL, competition PnL %, position PnL %, equity, volume, collateral, leverage, estimated open/borrow/close fees, gross PnL, current position value, open trade, TP/SL trigger orders, size, entry price, and latest parsed trade. With `--trader-config-file`, trader names and starting equity come from the CSV. Without config, add `--starting-equity` to test a single wallet against a competition-style starting equity; otherwise equity is estimated from open-position collateral plus PnL and fees.
 
 The operator SSE watch endpoint can use the same gRPC-backed tracker with `transport=solstream`, for example `/api/operator/jupiter-perps/watch?transport=solstream&walletAddresses=<WALLET>&includeOraclePrices=true`. Solstream watch defaults to `signatureLimit=0` unless explicitly provided, so a provider without transaction-history RPC can still stream live round data from `fromSlot`.
 

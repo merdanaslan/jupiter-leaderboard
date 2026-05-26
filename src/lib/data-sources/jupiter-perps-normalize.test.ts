@@ -6,6 +6,8 @@ import {
   buildWalletSnapshot,
   CUSTODY_BY_MARKET,
   normalizeOpenPosition,
+  normalizePositionRequest,
+  normalizePositionRequestEvent,
   normalizeTradeEvent,
 } from "./jupiter-perps-normalize";
 
@@ -99,6 +101,116 @@ describe("Jupiter Perps IDL normalizers", () => {
     expect(trade?.timestamp).toBe("2024-05-22T17:46:50.000Z");
   });
 
+  it("normalizes close PositionRequest events for live TP/SL removals", () => {
+    const requestEvent = normalizePositionRequestEvent({
+      name: "ClosePositionRequestEvent",
+      signature: "sig",
+      slot: 123,
+      blockTime: 1716400010,
+      instructionIndex: 0,
+      data: {
+        owner,
+        positionRequestKey: position,
+      },
+    });
+
+    expect(requestEvent).toEqual(
+      expect.objectContaining({
+        owner: owner.toBase58(),
+        positionRequestKey: position.toBase58(),
+        action: "close",
+        timestamp: "2024-05-22T17:46:50.000Z",
+      }),
+    );
+  });
+
+  it("normalizes open TP and SL PositionRequest accounts", () => {
+    const takeProfit = normalizePositionRequest("request-tp", {
+      owner,
+      position,
+      custody: new PublicKey(CUSTODY_BY_MARKET.SOL),
+      requestChange: { decrease: {} },
+      requestType: { trigger: {} },
+      side: { long: {} },
+      sizeUsdDelta: new BN("150000000"),
+      triggerPrice: new BN("95000000"),
+      triggerAboveThreshold: true,
+      entirePosition: false,
+      executed: false,
+      counter: new BN("7"),
+      openTime: new BN("1716400010"),
+      updateTime: new BN("1716400020"),
+    });
+    const stopLoss = normalizePositionRequest("request-sl", {
+      owner,
+      position,
+      custody: new PublicKey(CUSTODY_BY_MARKET.SOL),
+      requestChange: { decrease: {} },
+      requestType: { trigger: {} },
+      side: { long: {} },
+      sizeUsdDelta: new BN("0"),
+      triggerPrice: new BN("80000000"),
+      triggerAboveThreshold: false,
+      entirePosition: true,
+      executed: false,
+      counter: new BN("8"),
+      openTime: new BN("1716400011"),
+      updateTime: new BN("1716400021"),
+    });
+
+    expect(takeProfit).toEqual(
+      expect.objectContaining({
+        pubkey: "request-tp",
+        owner: owner.toBase58(),
+        position: position.toBase58(),
+        market: "SOL",
+        side: "long",
+        kind: "TP",
+        sizeUsd: 150,
+        triggerPriceUsd: 95,
+        triggerAboveThreshold: true,
+        entirePosition: false,
+        counter: 7,
+      }),
+    );
+    expect(stopLoss).toEqual(
+      expect.objectContaining({
+        kind: "SL",
+        sizeUsd: 0,
+        triggerPriceUsd: 80,
+        entirePosition: true,
+      }),
+    );
+  });
+
+  it("ignores executed or non-trigger PositionRequest accounts", () => {
+    expect(
+      normalizePositionRequest("request-market", {
+        owner,
+        position,
+        custody: new PublicKey(CUSTODY_BY_MARKET.SOL),
+        requestChange: { decrease: {} },
+        requestType: { market: {} },
+        side: { long: {} },
+        triggerPrice: null,
+        executed: false,
+      }),
+    ).toBeNull();
+    expect(
+      normalizePositionRequest("request-executed", {
+        owner,
+        position,
+        custody: new PublicKey(CUSTODY_BY_MARKET.SOL),
+        requestChange: { decrease: {} },
+        requestType: { trigger: {} },
+        side: { long: {} },
+        triggerPrice: new BN("80000000"),
+        triggerAboveThreshold: false,
+        executed: true,
+      }),
+    ).toBeNull();
+  });
+
   it("builds a wallet snapshot with round volume, realized PnL, and display trade hints", () => {
     const trades = [
       {
@@ -158,7 +270,73 @@ describe("Jupiter Perps IDL normalizers", () => {
     expect(snapshot.unrealizedPnlUsd).toBe(0);
     expect(snapshot.totalPnlUsd).toBe(7);
     expect(snapshot.recentTrade?.market).toBe("ETH");
+    expect(snapshot.recentTrade?.action).toBe("decrease");
     expect(snapshot.openTrade?.market).toBe("SOL");
+  });
+
+  it("sums multiple increases and decreases into round volume and realized PnL", () => {
+    const snapshot = buildWalletSnapshot({
+      walletAddress: owner.toBase58(),
+      positions: [],
+      trades: [
+        {
+          name: "IncreasePositionEvent",
+          signature: "sig-1",
+          slot: 1,
+          blockTime: 1716400010,
+          owner: owner.toBase58(),
+          position: position.toBase58(),
+          market: "SOL",
+          side: "long",
+          notionalUsd: 30,
+          feeUsd: 0.02,
+          pnlUsd: 0,
+          priceUsd: 85,
+          timestamp: "2024-05-22T18:00:10.000Z",
+        },
+        {
+          name: "IncreasePositionEvent",
+          signature: "sig-2",
+          slot: 2,
+          blockTime: 1716400020,
+          owner: owner.toBase58(),
+          position: position.toBase58(),
+          market: "SOL",
+          side: "long",
+          notionalUsd: 15,
+          feeUsd: 0.01,
+          pnlUsd: 0,
+          priceUsd: 86,
+          timestamp: "2024-05-22T18:00:20.000Z",
+        },
+        {
+          name: "DecreasePositionEvent",
+          signature: "sig-3",
+          slot: 3,
+          blockTime: 1716400030,
+          owner: owner.toBase58(),
+          position: position.toBase58(),
+          market: "SOL",
+          side: "long",
+          notionalUsd: 20,
+          feeUsd: 0.01,
+          pnlUsd: 2.5,
+          priceUsd: 90,
+          timestamp: "2024-05-22T18:00:30.000Z",
+        },
+      ],
+    });
+
+    expect(snapshot.notionalVolumeUsd).toBe(65);
+    expect(snapshot.realizedPnlUsd).toBe(2.5);
+    expect(snapshot.openTrade).toBeUndefined();
+    expect(snapshot.recentTrade).toEqual(
+      expect.objectContaining({
+        action: "decrease",
+        notionalUsd: 20,
+        pnlUsd: 2.5,
+      }),
+    );
   });
 
   it("includes mark-to-market open position PnL when oracle prices are supplied", () => {

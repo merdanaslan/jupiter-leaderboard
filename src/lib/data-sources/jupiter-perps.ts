@@ -58,7 +58,7 @@ export class JupiterPerpsDataSource implements LeaderboardDataSource {
         "InstantDecreasePositionEvent",
         "LiquidateFullPositionEvent",
       ],
-      envVars: ["SOLANA_RPC_URL", "SOLANA_GRPC_URL", "SOLANA_STREAM_URL"],
+      envVars: ["SOLANA_RPC_URL", "SOLANA_BACKFILL_RPC_URL", "SOLANA_GRPC_URL", "SOLANA_STREAM_URL"],
     };
   }
 

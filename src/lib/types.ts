@@ -29,6 +29,7 @@ export interface RecentTrade {
   notionalUsd: number;
   pnlUsd?: number;
   timestamp: string;
+  action?: "increase" | "decrease" | "liquidate";
 }
 
 export interface OpenTrade {

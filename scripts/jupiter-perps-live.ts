@@ -16,6 +16,7 @@ import {
 import { JupiterPerpsLiveTracker } from "../src/lib/data-sources/jupiter-perps-live-tracker";
 import { JupiterPerpsSolstreamLiveTracker } from "../src/lib/data-sources/jupiter-perps-solstream-live-tracker";
 import { JupiterPerpsSolstreamAdapter } from "../src/lib/data-sources/jupiter-perps-solstream";
+import { formatTriggerOrdersForTerminal } from "../src/lib/data-sources/jupiter-perps-terminal-format";
 import type {
   JupiterPerpsTradeEvent,
   JupiterPerpsWalletSnapshot,
@@ -837,7 +838,8 @@ function renderTerminalLeaderboard(input: {
           closeFeeUsd: fees?.estimatedCloseFeeUsd ?? 0,
           feesUsd,
           grossPnlUsd,
-          open: score.openTrade ? formatOpenTrade(score.openTrade) : "--",
+          open: score.openTrade ? formatOpenTrade(score.openTrade) : score.recentTrade ? "closed" : "--",
+          triggerOrders: formatTriggerOrdersForTerminal(snapshot?.triggerOrders ?? [], snapshot?.triggerOrdersUnavailable),
           sizeUsd: score.openTrade?.sizeUsd,
           entryPrice: score.openTrade?.entryPrice,
           recent: score.recentTrade ? formatRecentTrade(score.recentTrade) : "--",
@@ -870,7 +872,8 @@ function renderTerminalLeaderboard(input: {
             closeFeeUsd: fees?.estimatedCloseFeeUsd ?? 0,
             feesUsd,
             grossPnlUsd,
-            open: snapshot.openTrade ? formatOpenTrade(snapshot.openTrade) : "--",
+            open: snapshot.openTrade ? formatOpenTrade(snapshot.openTrade) : snapshot.recentTrade ? "closed" : "--",
+            triggerOrders: formatTriggerOrdersForTerminal(snapshot.triggerOrders ?? [], snapshot.triggerOrdersUnavailable),
             sizeUsd: snapshot.openTrade?.sizeUsd,
             entryPrice: snapshot.openTrade?.entryPrice,
             recent: snapshot.recentTrade ? formatRecentTrade(snapshot.recentTrade) : "--",
@@ -878,6 +881,9 @@ function renderTerminalLeaderboard(input: {
         })
         .sort((a, b) => b.pnlUsd - a.pnlUsd || b.volume - a.volume)
         .map((row, index) => ({ ...row, rank: index + 1 }));
+
+  const width = terminalWidth();
+  const hasUnavailableTriggerOrders = rows.some((row) => row.triggerOrders === "unavailable");
 
   if (process.stdout.isTTY) console.clear();
   console.log("Jupiter Perps Live Leaderboard");
@@ -891,60 +897,73 @@ function renderTerminalLeaderboard(input: {
       .filter(Boolean)
       .join(" | "),
   );
-  console.log("".padEnd(208, "-"));
+  console.log(separator(width));
   console.log(
     [
-      pad("Rank", 5),
-      pad("Trader", 18),
-      pad("Net PnL", 13, "left"),
-      pad("Cup %", 10, "left"),
-      pad("Pos %", 10, "left"),
-      pad("Equity", 13, "left"),
-      pad("Volume", 13, "left"),
-      pad("Collat", 12, "left"),
-      pad("Lev", 7, "left"),
-      pad("OpenFee", 10, "left"),
-      pad("Borrow", 10, "left"),
-      pad("CloseFee", 10, "left"),
-      pad("FeeTot", 10, "left"),
-      pad("Gross", 12, "left"),
-      pad("Value", 12, "left"),
-      pad("Open", 14),
-      pad("Size", 12, "left"),
-      pad("Entry", 10, "left"),
-      pad("Recent", 18),
+      pad("Rank", 4),
+      pad("Trader", 16),
+      pad("Net PnL", 11, "left"),
+      pad("Cup %", 8, "left"),
+      pad("Pos %", 8, "left"),
+      pad("Equity", 10, "left"),
+      pad("Volume", 10, "left"),
+      pad("Collat", 9, "left"),
+      pad("Lev", 6, "left"),
+      pad("Open", 10, "left"),
+      pad("Recent", 20, "left"),
     ].join(" "),
   );
-  console.log("".padEnd(208, "-"));
+  console.log(
+    [
+      pad("", 4),
+      pad("", 16),
+      pad("Size", 10, "left"),
+      pad("Entry", 10, "left"),
+      pad("Gross", 10, "left"),
+      pad("Value", 10, "left"),
+      pad("FeeTot", 8, "left"),
+      pad("Fees", 24, "left"),
+      pad("TP/SL", 36, "left"),
+    ].join(" "),
+  );
+  console.log(separator(width));
 
   for (const row of rows) {
     console.log(
       [
-        pad(String(row.rank), 5),
-        pad(row.trader, 18),
-        pad(formatSignedUsd(row.pnlUsd), 13, "left"),
-        pad(formatPercent(row.pnlPercent), 10, "left"),
-        pad(formatPercent(row.positionPnlPercent), 10, "left"),
-        pad(formatUsd(row.equity), 13, "left"),
-        pad(formatUsd(row.volume), 13, "left"),
-        pad(formatUsd(row.collateralUsd), 12, "left"),
-        pad(formatLeverage(row.leverage), 7, "left"),
-        pad(formatUsd(row.openFeeUsd), 10, "left"),
-        pad(formatUsd(row.borrowFeeUsd), 10, "left"),
-        pad(formatUsd(row.closeFeeUsd), 10, "left"),
-        pad(formatUsd(row.feesUsd), 10, "left"),
-        pad(formatSignedUsd(row.grossPnlUsd), 12, "left"),
-        pad(formatUsd(row.positionValueUsd), 12, "left"),
-        pad(row.open, 14),
-        pad(row.sizeUsd === undefined ? "--" : formatUsd(row.sizeUsd), 12, "left"),
-        pad(row.entryPrice === undefined ? "--" : formatPrice(row.entryPrice), 10, "left"),
-        pad(row.recent, 18),
+        pad(String(row.rank), 4),
+        pad(row.trader, 16),
+        pad(formatSignedUsd(row.pnlUsd), 11, "left"),
+        pad(formatPercent(row.pnlPercent), 8, "left"),
+        pad(formatPercent(row.positionPnlPercent), 8, "left"),
+        pad(formatUsd(row.equity), 10, "left"),
+        pad(formatUsd(row.volume), 10, "left"),
+        pad(formatUsd(row.collateralUsd), 9, "left"),
+        pad(formatLeverage(row.leverage), 6, "left"),
+        pad(row.open, 10, "left"),
+        pad(row.recent, 20, "left"),
       ].join(" "),
     );
+    console.log(
+      [
+        pad("", 4),
+        pad("", 16),
+        pad(row.sizeUsd === undefined ? "--" : formatUsd(row.sizeUsd), 10, "left"),
+        pad(row.entryPrice === undefined ? "--" : formatPrice(row.entryPrice), 10, "left"),
+        pad(formatSignedUsd(row.grossPnlUsd), 10, "left"),
+        pad(formatUsd(row.positionValueUsd), 10, "left"),
+        pad(formatUsd(row.feesUsd), 8, "left"),
+        pad(formatFeeBreakdown(row), 24, "left"),
+        pad(row.triggerOrders, 36, "left"),
+      ].join(" "),
+    );
+    console.log(separator(width));
   }
 
-  console.log("".padEnd(208, "-"));
   console.log("Ctrl+C to stop. Net PnL subtracts parsed/estimated fees; Pos % is gross PnL divided by collateral.");
+  if (hasUnavailableTriggerOrders) {
+    console.log("TP/SL unavailable: public backfill failed; set SOLANA_BACKFILL_RPC_URL to a history-capable RPC for startup recovery.");
+  }
 }
 
 function formatOpenTrade(trade: NonNullable<TraderScore["openTrade"]>): string {
@@ -952,12 +971,30 @@ function formatOpenTrade(trade: NonNullable<TraderScore["openTrade"]>): string {
 }
 
 function formatRecentTrade(trade: NonNullable<TraderScore["recentTrade"]>): string {
-  return `${trade.market} ${trade.side} ${formatUsd(trade.notionalUsd)}`;
+  const action = trade.action ?? "trade";
+  const pnl = trade.pnlUsd === undefined ? "" : ` ${formatSignedUsd(trade.pnlUsd)}`;
+  return `${action} ${trade.market} ${trade.side} ${formatUsd(trade.notionalUsd)}${pnl}`;
+}
+
+function terminalWidth(): number {
+  return Math.max(122, Math.min(process.stdout.columns ?? 140, 160));
+}
+
+function separator(width: number): string {
+  return "".padEnd(width, "-");
 }
 
 function pad(value: string, width: number, align: "left" | "right" = "right"): string {
   if (value.length >= width) return value;
   return align === "left" ? value.padEnd(width) : value.padStart(width);
+}
+
+function formatFeeBreakdown(row: {
+  openFeeUsd: number;
+  borrowFeeUsd: number;
+  closeFeeUsd: number;
+}): string {
+  return `O ${formatUsd(row.openFeeUsd)} B ${formatUsd(row.borrowFeeUsd)} C ${formatUsd(row.closeFeeUsd)}`;
 }
 
 function formatNumber(value: number): string {
@@ -997,7 +1034,8 @@ function formatPrice(value: number): string {
 
 function formatLeverage(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return "--";
-  return `${value.toLocaleString("en-US", {
+  const truncated = Math.floor(value * 100) / 100;
+  return `${truncated.toLocaleString("en-US", {
     maximumFractionDigits: 2,
     minimumFractionDigits: 2,
   })}x`;
@@ -1052,6 +1090,7 @@ Examples:
 
 Environment:
   SOLANA_RPC_URL        Required RPC URL for RPC commands
+  SOLANA_BACKFILL_RPC_URL Optional history-capable RPC for TP/SL request backfill; public fallback is used when unset
   SOLANA_STREAM_URL     Optional WebSocket URL for live logs
   SOLANA_GRPC_URL       Required Solstream gRPC endpoint for grpc command
   SOLANA_GRPC_API_KEY   Optional Solstream API key metadata

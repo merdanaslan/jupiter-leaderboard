@@ -8,6 +8,7 @@ import {
 import type {
   JupiterPerpsOpenPosition,
   JupiterPerpsTradeEvent,
+  JupiterPerpsTriggerOrder,
   JupiterPerpsWalletSnapshot,
 } from "./jupiter-perps-normalize";
 
@@ -28,7 +29,31 @@ function emptySnapshot(): JupiterPerpsWalletSnapshot {
 describe("JupiterPerpsSolstreamLiveTracker", () => {
   it("builds live wallet snapshots from Solstream trades, positions, and oracle prices", async () => {
     let tradeHandler: ((update: { trade: JupiterPerpsTradeEvent; slot: number }) => void) | undefined;
+    let walletEventHandler: ((update: {
+      kind: string;
+      slot: number;
+      request?: {
+        name: string;
+        signature: string;
+        slot: number;
+        blockTime: number | null;
+        owner: string;
+        positionRequestKey: string;
+        action: "create" | "update" | "close";
+        timestamp: string;
+      };
+      trade?: JupiterPerpsTradeEvent;
+    }) => void) | undefined;
     let positionHandler: ((update: { position: JupiterPerpsOpenPosition; slot: number; isStartup: boolean }) => void) | undefined;
+    let triggerOrderHandler:
+      | ((update: {
+          order?: JupiterPerpsTriggerOrder;
+          pubkey?: string;
+          removed?: boolean;
+          slot: number;
+          isStartup: boolean;
+        }) => void)
+      | undefined;
     let oracleHandler:
       | ((update: {
           price: { market: "SOL"; custody: string; oracleAddress: string; priceUsd: number; exponent: number; timestamp: number };
@@ -37,16 +62,26 @@ describe("JupiterPerpsSolstreamLiveTracker", () => {
         }) => void)
       | undefined;
     const cancelTrade = vi.fn();
+    const cancelWalletEvents = vi.fn();
     const cancelPosition = vi.fn();
+    const cancelTriggerOrder = vi.fn();
     const cancelOracle = vi.fn();
     const adapter = {
       subscribeWalletTrades: vi.fn((_wallets, onTrade) => {
         tradeHandler = onTrade;
         return { id: "trades", cancel: cancelTrade };
       }),
+      subscribeWalletEvents: vi.fn((_wallets, onEvent) => {
+        walletEventHandler = onEvent;
+        return { id: "wallet-events", cancel: cancelWalletEvents };
+      }),
       subscribePositionAccounts: vi.fn((_wallets, onPosition) => {
         positionHandler = onPosition;
         return { id: "positions", cancel: cancelPosition };
+      }),
+      subscribePositionRequestAccounts: vi.fn((_wallets, onTriggerOrder) => {
+        triggerOrderHandler = onTriggerOrder;
+        return { id: "position-requests", cancel: cancelTriggerOrder };
       }),
       subscribeOraclePrices: vi.fn((onPrice) => {
         oracleHandler = onPrice;
@@ -88,13 +123,20 @@ describe("JupiterPerpsSolstreamLiveTracker", () => {
 
     const stop = await tracker.start((update) => updates.push(update));
 
-    expect(adapter.subscribeWalletTrades).toHaveBeenCalledWith(
+    expect(adapter.subscribeWalletEvents).toHaveBeenCalledWith(
       [walletAddress],
       expect.any(Function),
       expect.any(Function),
       { fromSlot: 123 },
     );
+    expect(adapter.subscribeWalletTrades).not.toHaveBeenCalled();
     expect(adapter.subscribePositionAccounts).toHaveBeenCalledWith(
+      [walletAddress],
+      expect.any(Function),
+      expect.any(Function),
+      { fromSlot: 123 },
+    );
+    expect(adapter.subscribePositionRequestAccounts).toHaveBeenCalledWith(
       [walletAddress],
       expect.any(Function),
       expect.any(Function),
@@ -131,7 +173,8 @@ describe("JupiterPerpsSolstreamLiveTracker", () => {
     expect(updates.at(-1)?.reason).toBe("position");
     expect(updates.at(-1)?.snapshot?.unrealizedPnlUsd).toBe(100);
 
-    tradeHandler?.({
+    walletEventHandler?.({
+      kind: "trade",
       trade: {
         name: "IncreasePositionEvent",
         signature: "sig",
@@ -153,6 +196,87 @@ describe("JupiterPerpsSolstreamLiveTracker", () => {
     expect(updates.at(-1)?.reason).toBe("trade");
     expect(updates.at(-1)?.snapshot?.notionalVolumeUsd).toBe(500);
 
+    triggerOrderHandler?.({
+      order: {
+        pubkey: "request",
+        owner: walletAddress,
+        position: "position",
+        market: "SOL",
+        side: "long",
+        kind: "TP",
+        sizeUsd: 250,
+        triggerPriceUsd: 120,
+        triggerAboveThreshold: true,
+        entirePosition: false,
+        counter: 1,
+        openTime: 1,
+        updateTime: 2,
+      },
+      slot: 126,
+      isStartup: false,
+    });
+
+    expect(updates.at(-1)?.reason).toBe("trigger-order");
+    expect(updates.at(-1)?.snapshot?.triggerOrders?.[0]).toEqual(
+      expect.objectContaining({
+        kind: "TP",
+        triggerPriceUsd: 120,
+      }),
+    );
+
+    walletEventHandler?.({
+      kind: "position-request",
+      request: {
+        name: "ClosePositionRequestEvent",
+        signature: "close-request-sig",
+        slot: 127,
+        blockTime: 1,
+        owner: walletAddress,
+        positionRequestKey: "request",
+        action: "close",
+        timestamp: "2026-05-23T10:00:00.000Z",
+      },
+      slot: 127,
+    });
+
+    expect(updates.at(-1)?.reason).toBe("trigger-order");
+    expect(updates.at(-1)?.positionRequestEvent?.action).toBe("close");
+    expect(updates.at(-1)?.triggerOrderRemoved).toBe(true);
+    expect(updates.at(-1)?.triggerOrderPubkey).toBe("request");
+    expect(updates.at(-1)?.snapshot?.triggerOrders).toEqual([]);
+
+    triggerOrderHandler?.({
+      order: {
+        pubkey: "request",
+        owner: walletAddress,
+        position: "position",
+        market: "SOL",
+        side: "long",
+        kind: "TP",
+        sizeUsd: 250,
+        triggerPriceUsd: 120,
+        triggerAboveThreshold: true,
+        entirePosition: false,
+        counter: 1,
+        openTime: 1,
+        updateTime: 2,
+      },
+      slot: 128,
+      isStartup: false,
+    });
+
+    triggerOrderHandler?.({
+      pubkey: "request",
+      removed: true,
+      slot: 129,
+      isStartup: false,
+    });
+
+    expect(updates.at(-1)?.reason).toBe("trigger-order");
+    expect(updates.at(-1)?.triggerOrderRemoved).toBe(true);
+    expect(updates.at(-1)?.triggerOrderPubkey).toBe("request");
+    expect(updates.at(-1)?.snapshot?.triggerOrders).toEqual([]);
+
     oracleHandler?.({
       price: {
         market: "SOL",
@@ -162,16 +286,39 @@ describe("JupiterPerpsSolstreamLiveTracker", () => {
         exponent: 8,
         timestamp: 2,
       },
-      slot: 126,
+      slot: 127,
       isStartup: false,
     });
 
     expect(updates.at(-1)?.reason).toBe("oracle");
     expect(updates.at(-1)?.snapshots[0].unrealizedPnlUsd).toBe(200);
 
+    positionHandler?.({
+      position: {
+        pubkey: "position",
+        owner: walletAddress,
+        market: "SOL",
+        side: "long",
+        sizeUsd: 0,
+        collateralUsd: 0,
+        entryPriceUsd: 90,
+        realisedPnlUsd: 0,
+        openTime: 1,
+        updateTime: 3,
+      },
+      slot: 128,
+      isStartup: false,
+    });
+
+    expect(updates.at(-1)?.reason).toBe("position");
+    expect(updates.at(-1)?.snapshot?.positions).toEqual([]);
+    expect(updates.at(-1)?.snapshot?.openTrade).toBeUndefined();
+
     await stop();
-    expect(cancelTrade).toHaveBeenCalled();
+    expect(cancelTrade).not.toHaveBeenCalled();
+    expect(cancelWalletEvents).toHaveBeenCalled();
     expect(cancelPosition).toHaveBeenCalled();
+    expect(cancelTriggerOrder).toHaveBeenCalled();
     expect(cancelOracle).toHaveBeenCalled();
   });
 

@@ -132,6 +132,23 @@ describe("JupiterPerpsLiveTracker", () => {
     expect(updates.at(-1)?.snapshots[0].unrealizedPnlUsd).toBe(200);
     expect(updates.at(-1)?.snapshots[0].totalPnlUsd).toBe(212);
 
+    positionHandler?.({
+      pubkey: "position",
+      owner: walletAddress,
+      market: "SOL",
+      side: "long",
+      sizeUsd: 0,
+      collateralUsd: 0,
+      entryPriceUsd: 90,
+      realisedPnlUsd: 0,
+      openTime: 1,
+      updateTime: 4,
+    });
+
+    expect(updates.at(-1)?.reason).toBe("position");
+    expect(updates.at(-1)?.snapshot?.positions).toEqual([]);
+    expect(updates.at(-1)?.snapshot?.openTrade).toBeUndefined();
+
     await stop();
     expect(removeOnLogsListener).toHaveBeenCalledWith(10);
     expect(removeAccountChangeListener).toHaveBeenCalledWith(20);

@@ -18,12 +18,16 @@ import {
   JUPITER_PERPS_PROGRAM_ID,
   normalizeCustodyConfig,
   normalizeOpenPosition,
+  normalizePositionRequest,
+  normalizePositionRequestEvent,
   normalizeTradeEvent,
   publicKeyToString,
   type JupiterPerpsCustodyConfig,
   type DecodedPerpsEvent,
   type JupiterPerpsOpenPosition,
+  type JupiterPerpsPositionRequestEvent,
   type JupiterPerpsTradeEvent,
+  type JupiterPerpsTriggerOrder,
   type JupiterPerpsWalletSnapshot,
 } from "./jupiter-perps-normalize";
 
@@ -33,11 +37,15 @@ type PositionSide = Extract<TradeSide, "long" | "short">;
 const COMPETITION_MARKETS = ["SOL", "ETH", "BTC"] as const satisfies readonly TradeMarket[];
 const POSITION_COLLATERALS = ["SOL", "ETH", "BTC", "USDC", "USDT"] as const satisfies readonly CustodyKey[];
 const POSITION_SIDES = ["long", "short"] as const satisfies readonly PositionSide[];
+const POSITION_REQUEST_ACCOUNT_SIZE = 312;
+const DEFAULT_POSITION_REQUEST_SIGNATURE_LIMIT = 50;
+const DEFAULT_HISTORY_RPC_URL = "https://solana-rpc.publicnode.com";
 
 export interface FetchPerpsWalletInput {
   walletAddresses: string[];
   sinceUnixSeconds?: number;
   signatureLimit?: number;
+  positionRequestSignatureLimit?: number;
   includeClosedPositions?: boolean;
   includeOraclePrices?: boolean;
   pricesByMarket?: PricesByMarket;
@@ -80,6 +88,10 @@ export interface JupiterPerpsTransactionLike {
   }[];
 }
 
+export type JupiterPerpsDecodedWalletEvent =
+  | { kind: "trade"; trade: JupiterPerpsTradeEvent }
+  | { kind: "position-request"; request: JupiterPerpsPositionRequestEvent };
+
 export interface FetchPerpsWalletResult {
   programId: string;
   eventAuthority: string;
@@ -94,6 +106,7 @@ export class JupiterPerpsOnChainClient {
   readonly pool: PublicKey;
   readonly coder: BorshCoder;
   readonly oracleClient: JupiterPerpsOracleClient;
+  readonly historyConnection: Connection;
 
   constructor(
     readonly connection: Connection,
@@ -101,6 +114,7 @@ export class JupiterPerpsOnChainClient {
       programId?: string;
       eventAuthority?: string;
       idl?: Idl;
+      historyConnection?: Connection;
     } = {},
   ) {
     this.programId = new PublicKey(options.programId ?? JUPITER_PERPS_PROGRAM_ID);
@@ -108,6 +122,7 @@ export class JupiterPerpsOnChainClient {
     this.pool = new PublicKey(JLP_POOL_ACCOUNT);
     this.coder = new BorshCoder((options.idl ?? idlJson) as Idl);
     this.oracleClient = new JupiterPerpsOracleClient(connection);
+    this.historyConnection = options.historyConnection ?? connection;
   }
 
   positionFilters(walletAddress: string): GetProgramAccountsFilter[] {
@@ -124,11 +139,101 @@ export class JupiterPerpsOnChainClient {
     ];
   }
 
+  positionRequestFilters(walletAddress: string): GetProgramAccountsFilter[] {
+    return [
+      {
+        dataSize: POSITION_REQUEST_ACCOUNT_SIZE,
+      },
+      {
+        memcmp: {
+          bytes: new PublicKey(walletAddress).toBase58(),
+          offset: 8,
+        },
+      },
+      {
+        memcmp: this.coder.accounts.memcmp("PositionRequest"),
+      },
+    ];
+  }
+
   async fetchOpenPositionsForWallet(
     walletAddress: string,
     options: { includeClosedPositions?: boolean } = {},
   ): Promise<JupiterPerpsOpenPosition[]> {
     return this.fetchDerivedPositionsForWallet(walletAddress, options);
+  }
+
+  async fetchOpenTriggerOrdersForWallet(walletAddress: string): Promise<JupiterPerpsTriggerOrder[]> {
+    const accounts = await this.connection.getProgramAccounts(this.programId, {
+      commitment: "confirmed",
+      filters: this.positionRequestFilters(walletAddress),
+    });
+
+    return accounts
+      .map(({ pubkey, account }) => this.decodePositionRequestAccount(pubkey.toBase58(), account.data))
+      .filter((order): order is JupiterPerpsTriggerOrder => Boolean(order))
+      .sort((a, b) => a.triggerPriceUsd - b.triggerPriceUsd || a.counter - b.counter);
+  }
+
+  async fetchOpenTriggerOrdersForWalletByRecentEvents(
+    walletAddress: string,
+    options: {
+      signatureLimit?: number;
+      sinceUnixSeconds?: number;
+    } = {},
+  ): Promise<JupiterPerpsTriggerOrder[]> {
+    const requestKeys = await this.fetchRecentPositionRequestKeysForWallet(walletAddress, options);
+    if (requestKeys.length === 0) return [];
+
+    const accounts = await this.fetchMultipleAccounts(
+      requestKeys.map((key) => new PublicKey(key)),
+      this.connection,
+    );
+
+    return accounts
+      .map((account, index) => {
+        if (!account || !account.owner.equals(this.programId)) return null;
+        return this.decodePositionRequestAccount(requestKeys[index], account.data);
+      })
+      .filter((order): order is JupiterPerpsTriggerOrder => Boolean(order))
+      .sort((a, b) => a.triggerPriceUsd - b.triggerPriceUsd || a.counter - b.counter);
+  }
+
+  async fetchRecentPositionRequestKeysForWallet(
+    walletAddress: string,
+    options: {
+      signatureLimit?: number;
+      sinceUnixSeconds?: number;
+    } = {},
+  ): Promise<string[]> {
+    const normalizedWallet = new PublicKey(walletAddress).toBase58();
+    const signatureLimit = options.signatureLimit ?? DEFAULT_POSITION_REQUEST_SIGNATURE_LIMIT;
+    if (signatureLimit === 0) return [];
+
+    const signatures = await this.fetchSignaturesForAddress(
+      new PublicKey(normalizedWallet),
+      {
+        sinceUnixSeconds: options.sinceUnixSeconds,
+        limit: signatureLimit,
+      },
+      this.historyConnection,
+    );
+    const transactions = await this.fetchTransactions(signatures, this.historyConnection);
+    const requestKeys = new Set<string>();
+
+    transactions.forEach((tx, index) => {
+      if (!tx) return;
+      for (const event of this.decodeEventsFromTransaction(tx, signatures[index])
+        .map((decodedEvent) => normalizePositionRequestEvent(decodedEvent))
+        .filter((requestEvent): requestEvent is JupiterPerpsPositionRequestEvent => Boolean(requestEvent))) {
+        if (event.owner !== normalizedWallet) continue;
+
+        const requestKey = publicKeyToString(event.positionRequestKey);
+        if (requestKey) requestKeys.add(requestKey);
+      }
+    });
+
+    return [...requestKeys];
   }
 
   derivePositionAddress(input: {
@@ -315,11 +420,17 @@ export class JupiterPerpsOnChainClient {
     const custodyConfigsByAddress = await this.fetchCustodyConfigsByAddress();
     const positionsByWallet = [];
     for (const walletAddress of normalizedWallets) {
+      const triggerOrdersResult = await this.fetchOpenTriggerOrdersForWalletSafe(walletAddress, {
+        signatureLimit: input.positionRequestSignatureLimit,
+        sinceUnixSeconds: input.sinceUnixSeconds,
+      });
       positionsByWallet.push({
         walletAddress,
         positions: await this.fetchOpenPositionsForWallet(walletAddress, {
           includeClosedPositions: input.includeClosedPositions,
         }),
+        triggerOrders: triggerOrdersResult.orders,
+        triggerOrdersUnavailable: triggerOrdersResult.unavailable,
       });
     }
     const tradeResult = await this.fetchRecentTradeEvents({
@@ -335,11 +446,13 @@ export class JupiterPerpsOnChainClient {
       eventAuthority: this.eventAuthority.toBase58(),
       fetchedSignatureCount: tradeResult.signatures.length,
       parsedEventCount: tradeResult.events.length,
-      wallets: positionsByWallet.map(({ walletAddress, positions }) =>
+      wallets: positionsByWallet.map(({ walletAddress, positions, triggerOrders, triggerOrdersUnavailable }) =>
         buildWalletSnapshot({
           walletAddress,
           positions,
           trades: tradesByWallet.get(walletAddress) ?? [],
+          triggerOrders,
+          triggerOrdersUnavailable,
           pricesByMarket,
           custodyConfigsByAddress,
         }),
@@ -368,6 +481,34 @@ export class JupiterPerpsOnChainClient {
     return configs;
   }
 
+  private async fetchOpenTriggerOrdersForWalletSafe(
+    walletAddress: string,
+    options: {
+      signatureLimit?: number;
+      sinceUnixSeconds?: number;
+    } = {},
+  ): Promise<{
+    orders: JupiterPerpsTriggerOrder[];
+    unavailable?: boolean;
+  }> {
+    try {
+      return {
+        orders: await this.fetchOpenTriggerOrdersForWallet(walletAddress),
+      };
+    } catch {
+      try {
+        return {
+          orders: await this.fetchOpenTriggerOrdersForWalletByRecentEvents(walletAddress, options),
+        };
+      } catch {
+        return {
+          orders: [],
+          unavailable: true,
+        };
+      }
+    }
+  }
+
   async fetchOraclePricesByMarket(): Promise<PricesByMarket> {
     return this.oracleClient.fetchPricesByMarket(["SOL", "ETH", "BTC"]);
   }
@@ -379,21 +520,64 @@ export class JupiterPerpsOnChainClient {
     );
   }
 
+  decodePositionRequestAccount(pubkey: string, data: Buffer | Uint8Array): JupiterPerpsTriggerOrder | null {
+    return normalizePositionRequest(
+      pubkey,
+      this.coder.accounts.decode("PositionRequest", Buffer.from(data)) as Record<string, unknown>,
+    );
+  }
+
   decodeTradeEventsFromTransactionLike(tx: JupiterPerpsTransactionLike): JupiterPerpsTradeEvent[] {
     return this.decodeEventsFromTransactionLike(tx)
       .map((event) => normalizeTradeEvent(event))
       .filter((event): event is JupiterPerpsTradeEvent => Boolean(event));
   }
 
+  decodePositionRequestEventsFromTransactionLike(tx: JupiterPerpsTransactionLike): JupiterPerpsPositionRequestEvent[] {
+    return this.decodeEventsFromTransactionLike(tx)
+      .map((event) => normalizePositionRequestEvent(event))
+      .filter((event): event is JupiterPerpsPositionRequestEvent => Boolean(event));
+  }
+
+  decodeWalletEventsFromTransactionLike(tx: JupiterPerpsTransactionLike): JupiterPerpsDecodedWalletEvent[] {
+    const walletEvents: JupiterPerpsDecodedWalletEvent[] = [];
+
+    for (const event of this.decodeEventsFromTransactionLike(tx)) {
+      const trade = normalizeTradeEvent(event);
+      if (trade) {
+        walletEvents.push({ kind: "trade", trade });
+        continue;
+      }
+
+      const request = normalizePositionRequestEvent(event);
+      if (request) {
+        walletEvents.push({ kind: "position-request", request });
+      }
+    }
+
+    return walletEvents;
+  }
+
   private async fetchEventAuthoritySignatures(options: {
     sinceUnixSeconds?: number;
     limit: number;
   }): Promise<string[]> {
+    return this.fetchSignaturesForAddress(this.eventAuthority, options, this.connection);
+  }
+
+  private async fetchSignaturesForAddress(
+    address: PublicKey,
+    options: {
+      sinceUnixSeconds?: number;
+      limit: number;
+    },
+    connection: Connection,
+  ): Promise<string[]> {
     const signatures: string[] = [];
     let before: string | undefined;
 
     while (signatures.length < options.limit) {
-      const batch = await this.connection.getSignaturesForAddress(this.eventAuthority, {
+      const batch = await connection.getSignaturesForAddress(address, {
         before,
         limit: Math.min(100, options.limit - signatures.length),
       });
@@ -414,27 +598,55 @@ export class JupiterPerpsOnChainClient {
     return signatures;
   }
 
-  private async fetchTransactions(signatures: string[]): Promise<(VersionedTransactionResponse | null)[]> {
+  private async fetchTransactions(
+    signatures: string[],
+    connection = this.connection,
+  ): Promise<(VersionedTransactionResponse | null)[]> {
     const chunks = chunk(signatures, 25);
     const results: (VersionedTransactionResponse | null)[] = [];
 
     for (const signatureChunk of chunks) {
-      const txs = await this.connection.getTransactions(signatureChunk, {
-        commitment: "confirmed",
-        maxSupportedTransactionVersion: 0,
-      });
+      const txs = await this.fetchTransactionChunk(signatureChunk, connection);
       results.push(...txs);
     }
 
     return results;
   }
 
-  private async fetchMultipleAccounts(pubkeys: PublicKey[]) {
+  private async fetchTransactionChunk(
+    signatures: string[],
+    connection: Connection,
+  ): Promise<(VersionedTransactionResponse | null)[]> {
+    try {
+      return await connection.getTransactions(signatures, {
+        commitment: "confirmed",
+        maxSupportedTransactionVersion: 0,
+      });
+    } catch (error) {
+      if (signatures.length <= 1 || !isTransactionBatchLimitError(error)) {
+        throw error;
+      }
+
+      const transactions = [];
+      for (const signature of signatures) {
+        transactions.push(
+          await connection.getTransaction(signature, {
+            commitment: "confirmed",
+            maxSupportedTransactionVersion: 0,
+          }),
+        );
+      }
+
+      return transactions;
+    }
+  }
+
+  private async fetchMultipleAccounts(pubkeys: PublicKey[], connection = this.connection) {
     const chunks = chunk(pubkeys, 100);
     const results = [];
 
     for (const pubkeyChunk of chunks) {
-      results.push(...(await this.connection.getMultipleAccountsInfo(pubkeyChunk, "confirmed")));
+      results.push(...(await connection.getMultipleAccountsInfo(pubkeyChunk, "confirmed")));
     }
 
     return results;
@@ -513,12 +725,21 @@ export function createJupiterPerpsClientFromEnv(): JupiterPerpsOnChainClient {
   if (!rpcUrl) {
     throw new Error("Missing SOLANA_RPC_URL");
   }
+  const historyRpcUrl =
+    process.env.SOLANA_BACKFILL_RPC_URL ||
+    process.env.SOLANA_HISTORY_RPC_URL ||
+    DEFAULT_HISTORY_RPC_URL;
 
   return new JupiterPerpsOnChainClient(
     new Connection(rpcUrl, {
       commitment: "confirmed",
       wsEndpoint: process.env.SOLANA_STREAM_URL || undefined,
     }),
+    {
+      historyConnection: new Connection(historyRpcUrl, {
+        commitment: "confirmed",
+      }),
+    },
   );
 }
 
@@ -537,4 +758,9 @@ function chunk<T>(items: T[], chunkSize: number): T[][] {
     chunks.push(items.slice(index, index + chunkSize));
   }
   return chunks;
+}
+
+function isTransactionBatchLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("getTransaction") && message.includes("batch");
 }

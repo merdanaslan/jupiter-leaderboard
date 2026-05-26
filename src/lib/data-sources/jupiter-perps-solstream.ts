@@ -4,7 +4,9 @@ import {
   JUPITER_PERPS_EVENT_AUTHORITY,
   JUPITER_PERPS_PROGRAM_ID,
   type JupiterPerpsOpenPosition,
+  type JupiterPerpsPositionRequestEvent,
   type JupiterPerpsTradeEvent,
+  type JupiterPerpsTriggerOrder,
 } from "./jupiter-perps-normalize";
 import { DOVES_ORACLE_BY_MARKET, type JupiterPerpsOraclePrice } from "./jupiter-perps-oracle";
 import {
@@ -28,6 +30,26 @@ export interface JupiterPerpsSolstreamPositionUpdate {
 export interface JupiterPerpsSolstreamTradeUpdate {
   trade: JupiterPerpsTradeEvent;
   slot: number;
+}
+
+export type JupiterPerpsSolstreamWalletEventUpdate =
+  | {
+      kind: "trade";
+      trade: JupiterPerpsTradeEvent;
+      slot: number;
+    }
+  | {
+      kind: "position-request";
+      request: JupiterPerpsPositionRequestEvent;
+      slot: number;
+    };
+
+export interface JupiterPerpsSolstreamTriggerOrderUpdate {
+  pubkey: string;
+  order?: JupiterPerpsTriggerOrder;
+  removed?: boolean;
+  slot: number;
+  isStartup: boolean;
 }
 
 export interface JupiterPerpsSolstreamOracleUpdate {
@@ -98,6 +120,26 @@ export class JupiterPerpsSolstreamAdapter {
     onError?: (error: Error) => void,
     options: JupiterPerpsSolstreamAdapterOptions = {},
   ): SolstreamSubscription {
+    return this.subscribeWalletEvents(
+      walletAddresses,
+      (update) => {
+        if (update.kind !== "trade") return;
+        onTrade({
+          trade: update.trade,
+          slot: update.slot,
+        });
+      },
+      onError,
+      options,
+    );
+  }
+
+  subscribeWalletEvents(
+    walletAddresses: string[],
+    onEvent: (update: JupiterPerpsSolstreamWalletEventUpdate) => void,
+    onError?: (error: Error) => void,
+    options: JupiterPerpsSolstreamAdapterOptions = {},
+  ): SolstreamSubscription {
     const walletSet = walletAddresses.length
       ? new Set(walletAddresses.map((address) => new PublicKey(address).toBase58()))
       : null;
@@ -111,12 +153,82 @@ export class JupiterPerpsSolstreamAdapter {
       (update) => {
         if (update.kind !== "transaction" || !update.data.success) return;
 
-        for (const trade of this.perpsClient.decodeTradeEventsFromTransactionLike(update.data)) {
-          if (walletSet && !walletSet.has(trade.owner)) continue;
-          onTrade({
-            trade,
-            slot: update.data.slot,
+        for (const event of this.perpsClient.decodeWalletEventsFromTransactionLike(update.data)) {
+          const owner = event.kind === "trade" ? event.trade.owner : event.request.owner;
+          if (walletSet && !walletSet.has(owner)) continue;
+          onEvent({ ...event, slot: update.data.slot });
+        }
+      },
+      onError,
+    );
+  }
+
+  subscribePositionRequestAccounts(
+    walletAddresses: string[],
+    onOrder: (update: JupiterPerpsSolstreamTriggerOrderUpdate) => void,
+    onError?: (error: Error) => void,
+    options: JupiterPerpsSolstreamAdapterOptions = {},
+  ): SolstreamSubscription {
+    const normalizedWallets = walletAddresses.map((address) => new PublicKey(address).toBase58());
+    if (normalizedWallets.length === 0) {
+      throw new Error("No wallets were provided for PositionRequest account subscriptions");
+    }
+
+    return this.solstreamClient.subscribe(
+      {
+        accounts: Object.fromEntries(
+          normalizedWallets.map((walletAddress) => [
+            `jupiter-perps-position-requests-${walletAddress}`,
+            {
+              owner: [JUPITER_PERPS_PROGRAM_ID],
+              filters: this.perpsClient.positionRequestFilters(walletAddress).map((filter) => {
+                if ("dataSize" in filter) {
+                  return { datasize: filter.dataSize };
+                }
+
+                return {
+                  memcmp: {
+                    offset: filter.memcmp.offset,
+                    base58: filter.memcmp.bytes,
+                  },
+                };
+              }),
+            },
+          ]),
+        ),
+        commitment: options.commitment ?? SolstreamCommitmentLevel.CONFIRMED,
+        fromSlot: options.fromSlot,
+      },
+      (update) => {
+        if (update.kind !== "account") return;
+        const baseUpdate = {
+          pubkey: update.data.pubkey,
+          slot: update.data.slot,
+          isStartup: update.data.isStartup,
+        };
+
+        if (
+          update.data.owner !== JUPITER_PERPS_PROGRAM_ID ||
+          update.data.lamports === BigInt(0) ||
+          update.data.data.length === 0
+        ) {
+          onOrder({
+            ...baseUpdate,
+            removed: true,
           });
+          return;
+        }
+
+        try {
+          const order = this.perpsClient.decodePositionRequestAccount(update.data.pubkey, update.data.data);
+
+          onOrder({
+            ...baseUpdate,
+            order: order ?? undefined,
+            removed: !order,
+          });
+        } catch (error) {
+          onError?.(error instanceof Error ? error : new Error(String(error)));
         }
       },
       onError,

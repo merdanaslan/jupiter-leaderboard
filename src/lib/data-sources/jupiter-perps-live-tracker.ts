@@ -8,6 +8,7 @@ import {
   type JupiterPerpsCustodyConfig,
   type JupiterPerpsOpenPosition,
   type JupiterPerpsTradeEvent,
+  type JupiterPerpsTriggerOrder,
   type JupiterPerpsWalletSnapshot,
 } from "./jupiter-perps-normalize";
 
@@ -37,6 +38,8 @@ export class JupiterPerpsLiveTracker {
   private readonly walletAddresses: string[];
   private readonly positionMapsByWallet = new Map<string, Map<string, JupiterPerpsOpenPosition>>();
   private readonly tradesByWallet = new Map<string, JupiterPerpsTradeEvent[]>();
+  private readonly triggerOrdersByWallet = new Map<string, JupiterPerpsTriggerOrder[]>();
+  private readonly triggerOrdersUnavailableByWallet = new Map<string, boolean>();
   private readonly initialOpenVolumeByWallet = new Map<string, number>();
   private readonly oraclePricesByMarket = new Map<TradeMarket, JupiterPerpsOraclePrice>();
   private custodyConfigsByAddress = new Map<string, JupiterPerpsCustodyConfig>();
@@ -50,6 +53,8 @@ export class JupiterPerpsLiveTracker {
     this.walletAddresses.forEach((walletAddress) => {
       this.positionMapsByWallet.set(walletAddress, new Map());
       this.tradesByWallet.set(walletAddress, []);
+      this.triggerOrdersByWallet.set(walletAddress, []);
+      this.triggerOrdersUnavailableByWallet.set(walletAddress, false);
     });
   }
 
@@ -150,6 +155,8 @@ export class JupiterPerpsLiveTracker {
         }
       }
       this.positionMapsByWallet.set(snapshot.walletAddress, positions);
+      this.triggerOrdersByWallet.set(snapshot.walletAddress, snapshot.triggerOrders ?? []);
+      this.triggerOrdersUnavailableByWallet.set(snapshot.walletAddress, snapshot.triggerOrdersUnavailable === true);
       this.initialOpenVolumeByWallet.set(snapshot.walletAddress, snapshot.syntheticOpenPositionVolumeUsd ?? 0);
 
       snapshot.trades.forEach((trade) => this.addTrade(trade));
@@ -213,6 +220,8 @@ export class JupiterPerpsLiveTracker {
       walletAddress,
       positions: [...(this.positionMapsByWallet.get(walletAddress)?.values() ?? [])],
       trades: this.tradesByWallet.get(walletAddress) ?? [],
+      triggerOrders: this.triggerOrdersByWallet.get(walletAddress) ?? [],
+      triggerOrdersUnavailable: this.triggerOrdersUnavailableByWallet.get(walletAddress),
       pricesByMarket: this.pricesByMarket,
       custodyConfigsByAddress: this.custodyConfigsByAddress,
       syntheticOpenPositionVolumeUsd: this.initialOpenVolumeByWallet.get(walletAddress),

@@ -35,6 +35,18 @@ const TRADE_EVENT_NAMES = new Set([
   "LiquidateFullPositionEvent",
 ]);
 
+const POSITION_REQUEST_EVENT_NAMES = new Set([
+  "CreatePositionRequestEvent",
+  "ClosePositionRequestEvent",
+  "InstantCreateLimitOrderEvent",
+  "InstantCreateTpslEvent",
+  "InstantUpdateTpslEvent",
+]);
+
+type RequestChange = "none" | "increase" | "decrease" | "unknown";
+type RequestType = "market" | "trigger" | "unknown";
+export type JupiterPerpsPositionRequestAction = "create" | "update" | "close";
+
 export interface DecodedPerpsEvent {
   name: string;
   data: Record<string, unknown>;
@@ -60,6 +72,17 @@ export interface JupiterPerpsTradeEvent {
   priceImpactFeeUsd?: number;
   pnlUsd: number;
   priceUsd: number | null;
+  timestamp: string;
+}
+
+export interface JupiterPerpsPositionRequestEvent {
+  name: string;
+  signature: string;
+  slot: number;
+  blockTime: number | null;
+  owner: string;
+  positionRequestKey: string;
+  action: JupiterPerpsPositionRequestAction;
   timestamp: string;
 }
 
@@ -101,10 +124,28 @@ export interface JupiterPerpsFeeSummary {
   totalFeesUsd: number;
 }
 
+export interface JupiterPerpsTriggerOrder {
+  pubkey: string;
+  owner: string;
+  position: string;
+  market: TradeMarket | "UNKNOWN";
+  side: TradeSide | "unknown";
+  kind: "TP" | "SL" | "trigger";
+  sizeUsd: number;
+  triggerPriceUsd: number;
+  triggerAboveThreshold: boolean;
+  entirePosition: boolean;
+  counter: number;
+  openTime: number;
+  updateTime: number;
+}
+
 export interface JupiterPerpsWalletSnapshot {
   walletAddress: string;
   positions: JupiterPerpsOpenPosition[];
   trades: JupiterPerpsTradeEvent[];
+  triggerOrders?: JupiterPerpsTriggerOrder[];
+  triggerOrdersUnavailable?: boolean;
   tradeNotionalVolumeUsd?: number;
   openPositionNotionalUsd?: number;
   syntheticOpenPositionVolumeUsd?: number;
@@ -159,6 +200,28 @@ export function sideToString(value: unknown): TradeSide | "unknown" {
   return "unknown";
 }
 
+export function requestChangeToString(value: unknown): RequestChange {
+  if (!value || typeof value !== "object") return "unknown";
+  const requestChange = value as Record<string, unknown>;
+  if ("none" in requestChange || "None" in requestChange) return "none";
+  if ("increase" in requestChange || "Increase" in requestChange) return "increase";
+  if ("decrease" in requestChange || "Decrease" in requestChange) return "decrease";
+  return "unknown";
+}
+
+export function requestTypeToString(value: unknown): RequestType {
+  if (!value || typeof value !== "object") return "unknown";
+  const requestType = value as Record<string, unknown>;
+  if ("market" in requestType || "Market" in requestType) return "market";
+  if ("trigger" in requestType || "Trigger" in requestType) return "trigger";
+  return "unknown";
+}
+
+function optionBoolToBoolean(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") return value;
+  return fallback;
+}
+
 export function sideByteToString(value: unknown): TradeSide | "unknown" {
   const side = Number(value);
   if (side === 1) return "long";
@@ -172,6 +235,10 @@ export function marketFromCustody(custody: unknown): TradeMarket | "UNKNOWN" {
 
 export function isTradeEventName(name: string): boolean {
   return TRADE_EVENT_NAMES.has(name);
+}
+
+export function isPositionRequestEventName(name: string): boolean {
+  return POSITION_REQUEST_EVENT_NAMES.has(name);
 }
 
 export function normalizeOpenPosition(pubkey: string, account: Record<string, unknown>): JupiterPerpsOpenPosition {
@@ -209,6 +276,49 @@ export function normalizeCustodyConfig(pubkey: string, account: Record<string, u
     targetUtilizationRate: bnToRawNumber(jumpRateState.targetUtilizationRate),
     assetsOwned: bnToRawNumber(assets.owned),
     assetsLocked: bnToRawNumber(assets.locked),
+  };
+}
+
+export function normalizePositionRequest(
+  pubkey: string,
+  account: Record<string, unknown>,
+): JupiterPerpsTriggerOrder | null {
+  const requestChange = requestChangeToString(account.requestChange);
+  const requestType = requestTypeToString(account.requestType);
+  const triggerPriceUsd = bnToNumber(account.triggerPrice);
+  const executed = account.executed === true;
+
+  if (executed || requestChange !== "decrease" || requestType !== "trigger" || triggerPriceUsd <= 0) {
+    return null;
+  }
+
+  const side = sideToString(account.side);
+  const triggerAboveThreshold = optionBoolToBoolean(account.triggerAboveThreshold);
+  const kind =
+    side === "long"
+      ? triggerAboveThreshold
+        ? "TP"
+        : "SL"
+      : side === "short"
+        ? triggerAboveThreshold
+          ? "SL"
+          : "TP"
+        : "trigger";
+
+  return {
+    pubkey,
+    owner: publicKeyToString(account.owner),
+    position: publicKeyToString(account.position),
+    market: marketFromCustody(account.custody),
+    side,
+    kind,
+    sizeUsd: bnToNumber(account.sizeUsdDelta),
+    triggerPriceUsd,
+    triggerAboveThreshold,
+    entirePosition: optionBoolToBoolean(account.entirePosition),
+    counter: bnToRawNumber(account.counter),
+    openTime: Number(account.openTime?.toString?.() ?? account.openTime ?? 0),
+    updateTime: Number(account.updateTime?.toString?.() ?? account.updateTime ?? 0),
   };
 }
 
@@ -250,10 +360,36 @@ export function normalizeTradeEvent(event: DecodedPerpsEvent): JupiterPerpsTrade
   };
 }
 
+export function normalizePositionRequestEvent(event: DecodedPerpsEvent): JupiterPerpsPositionRequestEvent | null {
+  if (!isPositionRequestEventName(event.name)) return null;
+
+  const data = event.data;
+  const owner = publicKeyToString(data.owner);
+  const positionRequestKey = publicKeyToString(data.positionRequestKey);
+  if (!owner || !positionRequestKey) return null;
+
+  const timestampSeconds =
+    event.blockTime ??
+    Number(data.openTime?.toString?.() ?? data.updateTime?.toString?.() ?? 0);
+
+  return {
+    name: event.name,
+    signature: event.signature,
+    slot: event.slot,
+    blockTime: event.blockTime,
+    owner,
+    positionRequestKey,
+    action: positionRequestAction(event.name),
+    timestamp: timestampSeconds > 0 ? new Date(timestampSeconds * 1000).toISOString() : new Date(0).toISOString(),
+  };
+}
+
 export function buildWalletSnapshot(input: {
   walletAddress: string;
   positions: JupiterPerpsOpenPosition[];
   trades: JupiterPerpsTradeEvent[];
+  triggerOrders?: JupiterPerpsTriggerOrder[];
+  triggerOrdersUnavailable?: boolean;
   pricesByMarket?: PricesByMarket;
   custodyConfigsByAddress?: Map<string, JupiterPerpsCustodyConfig>;
   syntheticOpenPositionVolumeUsd?: number;
@@ -283,13 +419,15 @@ export function buildWalletSnapshot(input: {
   });
   const grossPnlUsd = realizedPnlUsd + unrealizedPnlUsd;
   const netPnlUsd = grossPnlUsd - fees.totalFeesUsd;
-  const latestTrade = input.trades.at(0);
+  const latestTrade = [...input.trades].sort((a, b) => b.slot - a.slot || b.signature.localeCompare(a.signature)).at(0);
   const largestPosition = [...input.positions].sort((a, b) => b.sizeUsd - a.sizeUsd)[0];
 
   return {
     walletAddress: input.walletAddress,
     positions: input.positions,
     trades: input.trades,
+    triggerOrders: input.triggerOrders ?? [],
+    triggerOrdersUnavailable: input.triggerOrdersUnavailable,
     tradeNotionalVolumeUsd,
     openPositionNotionalUsd,
     syntheticOpenPositionVolumeUsd: inferredOpenPositionVolumeUsd,
@@ -308,6 +446,7 @@ export function buildWalletSnapshot(input: {
           notionalUsd: latestTrade.notionalUsd,
           pnlUsd: latestTrade.pnlUsd,
           timestamp: latestTrade.timestamp,
+          action: tradeAction(latestTrade.name),
         }
       : undefined,
     openTrade: largestPosition && largestPosition.market !== "UNKNOWN" && largestPosition.side !== "unknown"
@@ -319,4 +458,17 @@ export function buildWalletSnapshot(input: {
         }
       : undefined,
   };
+}
+
+function tradeAction(name: string): RecentTrade["action"] {
+  if (name.includes("Liquidate")) return "liquidate";
+  if (name.includes("Decrease")) return "decrease";
+  if (name.includes("Increase")) return "increase";
+  return undefined;
+}
+
+function positionRequestAction(name: string): JupiterPerpsPositionRequestAction {
+  if (name.includes("Close")) return "close";
+  if (name.includes("Update")) return "update";
+  return "create";
 }
