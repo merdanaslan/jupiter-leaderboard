@@ -149,6 +149,7 @@ describe("JupiterPerpsSolstreamLiveTracker", () => {
       expect.objectContaining({
         walletAddresses: [walletAddress],
         signatureLimit: 0,
+        positionRequestSignatureLimit: 0,
       }),
     );
     expect(updates[0].reason).toBe("initial");
@@ -387,6 +388,129 @@ describe("JupiterPerpsSolstreamLiveTracker", () => {
     expect(updates[0].reason).toBe("initial");
     expect(updates[0].snapshots[0].notionalVolumeUsd).toBe(250);
     expect(updates[0].snapshots[0].trades[0].signature).toBe("live-sig");
+
+    await stop();
+  });
+
+  it("can start in live-only mode without startup RPC snapshot reads", async () => {
+    const adapter = {
+      subscribeWalletEvents: vi.fn(() => ({ id: "wallet-events", cancel: vi.fn() })),
+      subscribeWalletTrades: vi.fn(() => ({ id: "trades", cancel: vi.fn() })),
+      subscribePositionAccounts: vi.fn(() => ({ id: "positions", cancel: vi.fn() })),
+      subscribePositionRequestAccounts: vi.fn(() => ({ id: "position-requests", cancel: vi.fn() })),
+      subscribeOraclePrices: vi.fn(() => ({ id: "oracles", cancel: vi.fn() })),
+    };
+    const client = {
+      connection: {} as Connection,
+      fetchWalletSnapshots: vi.fn(async () => {
+        throw new Error("startup RPC unavailable");
+      }),
+      fetchCustodyConfigsByAddress: vi.fn(async () => {
+        throw new Error("custody RPC unavailable");
+      }),
+      oracleClient: {
+        fetchOraclePrices: vi.fn(async () => {
+          throw new Error("oracle RPC unavailable");
+        }),
+      },
+    } as unknown as JupiterPerpsOnChainClient;
+    const tracker = new JupiterPerpsSolstreamLiveTracker(
+      client,
+      {
+        walletAddresses: [walletAddress],
+        includeOraclePrices: true,
+        skipInitialSnapshot: true,
+      },
+      adapter,
+    );
+    const updates: JupiterPerpsSolstreamLiveUpdate[] = [];
+
+    const stop = await tracker.start((update) => updates.push(update));
+
+    expect(client.fetchWalletSnapshots).not.toHaveBeenCalled();
+    expect(client.oracleClient.fetchOraclePrices).not.toHaveBeenCalled();
+    expect(updates[0]).toEqual(
+      expect.objectContaining({
+        reason: "initial",
+        snapshots: [
+          expect.objectContaining({
+            walletAddress,
+            positions: [],
+            trades: [],
+          }),
+        ],
+      }),
+    );
+
+    await stop();
+  });
+
+  it("can continue with live updates when startup RPC snapshot reads fail", async () => {
+    let tradeHandler: ((update: { trade: JupiterPerpsTradeEvent; slot: number }) => void) | undefined;
+    const onError = vi.fn();
+    const adapter = {
+      subscribeWalletEvents: vi.fn((_wallets, onEvent) => {
+        tradeHandler = (update) => onEvent({ kind: "trade", ...update });
+        return { id: "wallet-events", cancel: vi.fn() };
+      }),
+      subscribeWalletTrades: vi.fn(() => ({ id: "trades", cancel: vi.fn() })),
+      subscribePositionAccounts: vi.fn(() => ({ id: "positions", cancel: vi.fn() })),
+      subscribePositionRequestAccounts: vi.fn(() => ({ id: "position-requests", cancel: vi.fn() })),
+      subscribeOraclePrices: vi.fn(() => ({ id: "oracles", cancel: vi.fn() })),
+    };
+    const client = {
+      connection: {} as Connection,
+      fetchWalletSnapshots: vi.fn(async () => {
+        throw new Error("startup RPC unavailable");
+      }),
+      oracleClient: {
+        fetchOraclePrices: vi.fn(async () => []),
+      },
+    } as unknown as JupiterPerpsOnChainClient;
+    const tracker = new JupiterPerpsSolstreamLiveTracker(
+      client,
+      {
+        walletAddresses: [walletAddress],
+        includeOraclePrices: false,
+        continueOnInitialSnapshotError: true,
+        onError,
+      },
+      adapter,
+    );
+    const updates: JupiterPerpsSolstreamLiveUpdate[] = [];
+
+    const stop = await tracker.start((update) => updates.push(update));
+
+    expect(client.fetchWalletSnapshots).toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: "startup RPC unavailable" }));
+    expect(updates[0]).toEqual(
+      expect.objectContaining({
+        reason: "initial",
+        snapshots: [expect.objectContaining({ walletAddress })],
+      }),
+    );
+
+    tradeHandler?.({
+      trade: {
+        name: "IncreasePositionEvent",
+        signature: "live-sig-after-rpc-failure",
+        slot: 10,
+        blockTime: 1,
+        owner: walletAddress,
+        position: "position",
+        market: "SOL",
+        side: "long",
+        notionalUsd: 250,
+        feeUsd: 1,
+        pnlUsd: 0,
+        priceUsd: 100,
+        timestamp: "2026-05-23T10:00:00.000Z",
+      },
+      slot: 10,
+    });
+
+    expect(updates.at(-1)?.reason).toBe("trade");
+    expect(updates.at(-1)?.snapshot?.notionalVolumeUsd).toBe(250);
 
     await stop();
   });

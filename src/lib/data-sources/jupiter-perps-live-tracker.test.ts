@@ -79,6 +79,12 @@ describe("JupiterPerpsLiveTracker", () => {
 
     const stop = await tracker.start((update) => updates.push(update));
 
+    expect(client.fetchWalletSnapshots).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signatureLimit: 10,
+        positionRequestSignatureLimit: 10,
+      }),
+    );
     expect(updates[0].reason).toBe("initial");
     expect(updates[0].snapshots[0].totalPnlUsd).toBe(0);
 

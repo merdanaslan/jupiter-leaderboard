@@ -1,5 +1,5 @@
-import { QualifierDisplay } from "@/components/leaderboard/qualifier-display";
+import { SummitQualifierPage } from "@/components/leaderboard/summit-qualifier-page";
 
 export default function QualifierPage() {
-  return <QualifierDisplay />;
+  return <SummitQualifierPage />;
 }

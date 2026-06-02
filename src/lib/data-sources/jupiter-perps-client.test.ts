@@ -231,6 +231,40 @@ describe("JupiterPerpsOnChainClient", () => {
     expect(getTransaction).toHaveBeenCalledTimes(2);
   });
 
+  it("falls back to sequential transaction fetches when batch requests are unavailable for one signature", async () => {
+    const getSignaturesForAddress = vi
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          signature: "sig-1",
+          slot: 1,
+          err: null,
+          memo: null,
+          blockTime: 1716400000,
+          confirmationStatus: "confirmed",
+        },
+      ])
+      .mockResolvedValue([]);
+    const getTransactions = vi.fn(async () => {
+      throw new Error("Batch requests are only available for paid plans");
+    });
+    const getTransaction = vi.fn(async () => ({ slot: 1, blockTime: 1716400000, meta: { innerInstructions: [] } }));
+    const client = new JupiterPerpsOnChainClient({
+      getSignaturesForAddress,
+      getTransactions,
+      getTransaction,
+    } as unknown as Connection);
+    vi.spyOn(client, "decodeEventsFromTransaction").mockReturnValue([]);
+
+    await client.fetchRecentTradeEvents({ signatureLimit: 1 });
+
+    expect(getTransactions).toHaveBeenCalledTimes(1);
+    expect(getTransaction).toHaveBeenCalledWith("sig-1", {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
+  });
+
   it("falls back to recent wallet request events when TP/SL account scans are unavailable", async () => {
     const client = new JupiterPerpsOnChainClient(new Connection("http://localhost:8899"));
     const triggerOrder = {

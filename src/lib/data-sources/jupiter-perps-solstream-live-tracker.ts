@@ -22,6 +22,8 @@ export interface JupiterPerpsSolstreamLiveTrackerOptions {
   signatureLimit?: number;
   includeClosedPositions?: boolean;
   includeOraclePrices?: boolean;
+  skipInitialSnapshot?: boolean;
+  continueOnInitialSnapshotError?: boolean;
   onError?: (error: Error) => void;
 }
 
@@ -210,13 +212,18 @@ export class JupiterPerpsSolstreamLiveTracker {
 
     try {
       await this.loadInitialSnapshots();
-      initialized = true;
-      onUpdate(this.buildUpdate({ reason: "initial" }));
-      return stop;
     } catch (error) {
-      await stop();
-      throw error;
+      const normalizedError = error instanceof Error ? error : new Error(String(error));
+      if (!this.options.continueOnInitialSnapshotError) {
+        await stop();
+        throw normalizedError;
+      }
+      handleError(normalizedError);
     }
+
+    initialized = true;
+    onUpdate(this.buildUpdate({ reason: "initial" }));
+    return stop;
   }
 
   getSnapshots(): JupiterPerpsWalletSnapshot[] {
@@ -224,6 +231,8 @@ export class JupiterPerpsSolstreamLiveTracker {
   }
 
   private async loadInitialSnapshots(): Promise<void> {
+    if (this.options.skipInitialSnapshot) return;
+
     if (this.options.includeOraclePrices !== false) {
       const oraclePrices = await this.client.oracleClient.fetchOraclePrices(this.openMarkets());
       oraclePrices.forEach((oraclePrice) => this.upsertOraclePrice(oraclePrice));
@@ -234,6 +243,7 @@ export class JupiterPerpsSolstreamLiveTracker {
       walletAddresses: this.walletAddresses,
       sinceUnixSeconds: this.options.sinceUnixSeconds,
       signatureLimit: this.options.signatureLimit ?? 0,
+      positionRequestSignatureLimit: this.options.signatureLimit ?? 0,
       includeClosedPositions: this.options.includeClosedPositions,
       pricesByMarket: this.pricesByMarket,
     });

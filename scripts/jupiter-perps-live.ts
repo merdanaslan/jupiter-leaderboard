@@ -14,9 +14,15 @@ import {
   parseWalletAddressList,
 } from "../src/lib/data-sources/jupiter-perps-request";
 import { JupiterPerpsLiveTracker } from "../src/lib/data-sources/jupiter-perps-live-tracker";
-import { JupiterPerpsSolstreamLiveTracker } from "../src/lib/data-sources/jupiter-perps-solstream-live-tracker";
+import {
+  JupiterPerpsSolstreamLiveTracker,
+  type JupiterPerpsSolstreamLiveUpdate,
+} from "../src/lib/data-sources/jupiter-perps-solstream-live-tracker";
 import { JupiterPerpsSolstreamAdapter } from "../src/lib/data-sources/jupiter-perps-solstream";
-import { formatTriggerOrdersForTerminal } from "../src/lib/data-sources/jupiter-perps-terminal-format";
+import {
+  formatTradeLifecycleDetailsForTerminal,
+  formatTriggerOrdersForTerminal,
+} from "../src/lib/data-sources/jupiter-perps-terminal-format";
 import type {
   JupiterPerpsTradeEvent,
   JupiterPerpsWalletSnapshot,
@@ -44,6 +50,10 @@ interface CliOptions {
   competitionMode?: CompetitionMode;
   publicScores: boolean;
   terminalLeaderboard: boolean;
+  tradeDetails: boolean;
+  historyLimit: number;
+  liveOnly: boolean;
+  strictStartupSnapshot: boolean;
   startingEquity?: number;
   grpcMode: GrpcMode;
   maxEvents: number;
@@ -308,17 +318,19 @@ async function watchSolstreamWalletSnapshots(
     signatureLimit: options.signatureLimitExplicit ? options.signatureLimit : 0,
     includeClosedPositions: options.includeClosedPositions,
     includeOraclePrices: options.includeOraclePrices,
+    skipInitialSnapshot: options.liveOnly,
+    continueOnInitialSnapshotError: !options.strictStartupSnapshot,
     onError: (error) => {
-      if (stopping) return;
+      if (stopping || isGrpcClientCancellation(error)) return;
       const message = error instanceof Error ? error.message : String(error);
       if (options.json) {
         console.log(JSON.stringify({ type: "error", message, receivedAt: new Date().toISOString() }));
       } else {
-        console.error(`Solstream snapshot error: ${message}`);
+        console.error(`Solstream warning: ${message}`);
       }
     },
   });
-  const stop = await tracker.start((update) => {
+  const handleUpdate = (update: JupiterPerpsSolstreamLiveUpdate) => {
     updateCount += 1;
     const scores = traderConfigs.length
       ? scoreJupiterPerpsSnapshots({
@@ -351,6 +363,8 @@ async function watchSolstreamWalletSnapshots(
           update,
           scores,
           startingEquity: options.startingEquity,
+          tradeDetails: options.tradeDetails,
+          historyLimit: options.historyLimit,
           equityBasis: traderConfigs.length
             ? "trader config"
             : options.startingEquity !== undefined
@@ -379,7 +393,20 @@ async function watchSolstreamWalletSnapshots(
     if (options.maxEvents > 0 && updateCount >= options.maxEvents) {
       resolveDone?.();
     }
-  });
+  };
+
+  let stop: () => Promise<void>;
+  try {
+    stop = await tracker.start(handleUpdate);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!options.liveOnly) {
+      throw new Error(
+        `${message}\n\nStartup RPC snapshot failed before grpc-watch initialized. This mode reads SOLANA_RPC_URL at startup to backfill current positions, TP/SL orders, and oracle prices. For fresh Trading Cup wallets, rerun with --live-only to skip all startup RPC reads and rely on Solstream live updates. To inspect already-open positions immediately, use a healthy SOLANA_RPC_URL or SOLANA_BACKFILL_RPC_URL.`,
+      );
+    }
+    throw error;
+  }
 
   if (!options.json && !options.terminalLeaderboard) {
     console.log(`Watching Solstream Jupiter Perps snapshots for ${walletAddresses.length} wallet(s).`);
@@ -587,6 +614,10 @@ function parseArgs(args: string[]): CliOptions {
     signatureLimitExplicit: false,
     publicScores: false,
     terminalLeaderboard: false,
+    tradeDetails: false,
+    historyLimit: 3,
+    liveOnly: false,
+    strictStartupSnapshot: false,
     grpcMode: "all",
     maxEvents: 0,
     timeoutMs: 30_000,
@@ -630,6 +661,23 @@ function parseArgs(args: string[]): CliOptions {
         break;
       case "--terminal-leaderboard":
         options.terminalLeaderboard = true;
+        break;
+      case "--trade-details":
+      case "--details":
+        options.tradeDetails = true;
+        break;
+      case "--live-only":
+      case "--skip-startup-snapshot":
+        options.liveOnly = true;
+        break;
+      case "--strict-startup-snapshot":
+        options.strictStartupSnapshot = true;
+        break;
+      case "--history":
+        requireValue(flag, value);
+        options.tradeDetails = true;
+        options.historyLimit = Number(value);
+        index += 1;
         break;
       case "--starting-equity":
         requireValue(flag, value);
@@ -711,6 +759,9 @@ function parseArgs(args: string[]): CliOptions {
   }
   if (!Number.isInteger(options.maxEvents) || options.maxEvents < 0) {
     throw new Error("--max-events must be a non-negative integer");
+  }
+  if (!Number.isInteger(options.historyLimit) || options.historyLimit <= 0) {
+    throw new Error("--history must be a positive integer");
   }
   if (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 0) {
     throw new Error("--timeout-ms must be a non-negative integer");
@@ -812,6 +863,8 @@ function renderTerminalLeaderboard(input: {
   };
   scores: TraderScore[] | null;
   startingEquity?: number;
+  tradeDetails?: boolean;
+  historyLimit?: number;
   equityBasis: string;
 }) {
   const snapshotsByWallet = new Map(input.update.snapshots.map((snapshot) => [snapshot.walletAddress, snapshot]));
@@ -824,6 +877,7 @@ function renderTerminalLeaderboard(input: {
         const feesUsd = fees?.totalFeesUsd ?? 0;
         return {
           rank: score.rank,
+          walletAddress: score.walletAddress,
           trader: score.xHandle || score.displayName,
           pnlUsd: score.pnlUsd,
           pnlPercent: score.pnlPercent,
@@ -858,6 +912,7 @@ function renderTerminalLeaderboard(input: {
 
           return {
             rank: 0,
+            walletAddress: snapshot.walletAddress,
             trader: shortAddress(snapshot.walletAddress),
             pnlUsd,
             pnlPercent: equityBase > 0 ? (pnlUsd / equityBase) * 100 : 0,
@@ -963,6 +1018,13 @@ function renderTerminalLeaderboard(input: {
   console.log("Ctrl+C to stop. Net PnL subtracts parsed/estimated fees; Pos % is gross PnL divided by collateral.");
   if (hasUnavailableTriggerOrders) {
     console.log("TP/SL unavailable: public backfill failed; set SOLANA_BACKFILL_RPC_URL to a history-capable RPC for startup recovery.");
+  }
+  if (input.tradeDetails) {
+    const details = formatTradeLifecycleDetailsForTerminal(input.update.snapshots, {
+      limitPerWallet: input.historyLimit,
+      walletOrder: rows.map((row) => row.walletAddress),
+    });
+    if (details) console.log(details);
   }
 }
 
@@ -1085,6 +1147,8 @@ Examples:
   npm run jupiter:grpc -- --grpc-mode oracle --timeout-ms 30000
   npm run jupiter:grpc-watch -- --wallet-file config/test-wallets.local.txt --signature-limit 0 --include-oracle-prices
   npm run jupiter:grpc-watch -- --wallet <WALLET> --include-oracle-prices --terminal-leaderboard --starting-equity 100
+  npm run jupiter:grpc-watch -- --wallet <WALLET> --include-oracle-prices --terminal-leaderboard --starting-equity 100 --trade-details
+  npm run jupiter:grpc-watch -- --wallet <WALLET> --include-oracle-prices --terminal-leaderboard --starting-equity 100 --trade-details --live-only
   npm run jupiter:grpc-watch -- --trader-config-file config/traders.local.csv --mode qualifier --terminal-leaderboard --include-oracle-prices
   npm run jupiter:grpc-watch -- --trader-config-file config/traders.local.csv --mode qualifier --public-scores --include-oracle-prices
 
@@ -1098,6 +1162,9 @@ Environment:
 Notes:
   Use --signature-limit 0 on snapshot/watch to skip event-history RPC calls and only read live Position accounts.
   Use --terminal-leaderboard on grpc-watch for a readable live CLI table instead of JSON or one-line logs.
+  Use --trade-details or --history <N> with --terminal-leaderboard to show internal grouped trade lifecycle details.
+  Use --live-only on grpc-watch for fresh cup wallets to skip all startup RPC snapshot reads and rely on Solstream startup/live updates.
+  By default, grpc-watch continues with live Solstream updates if startup RPC snapshot/backfill is unavailable; use --strict-startup-snapshot to fail instead.
   Use --starting-equity with --terminal-leaderboard when testing one wallet without trader config.
 `);
 }
@@ -1122,6 +1189,10 @@ function createJupiterPerpsDecodeClient(): JupiterPerpsOnChainClient {
   return new JupiterPerpsOnChainClient(
     new Connection(process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com", "confirmed"),
   );
+}
+
+function isGrpcClientCancellation(error: Error): boolean {
+  return error.message.includes("CANCELLED") && error.message.includes("Cancelled on client");
 }
 
 main().catch((error) => {

@@ -623,7 +623,7 @@ export class JupiterPerpsOnChainClient {
         maxSupportedTransactionVersion: 0,
       });
     } catch (error) {
-      if (signatures.length <= 1 || !isTransactionBatchLimitError(error)) {
+      if (!isTransactionBatchLimitError(error)) {
         throw error;
       }
 
@@ -762,5 +762,9 @@ function chunk<T>(items: T[], chunkSize: number): T[][] {
 
 function isTransactionBatchLimitError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
-  return message.includes("getTransaction") && message.includes("batch");
+  return (
+    (message.includes("getTransaction") && message.includes("batch")) ||
+    message.includes("Batch requests are only available") ||
+    (message.includes("Payload Too Large") && message.includes("Too many requests"))
+  );
 }

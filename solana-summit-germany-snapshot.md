@@ -1,0 +1,63 @@
+- generic [active] [ref=e1] [box=0,0,1440,8449]:
+  - main [ref=e3] [box=0,0,1440,8449]:
+    - generic [ref=e4] [box=0,0,1440,1200]:
+      - navigation [ref=e6] [box=0,0,1440,144]:
+        - link "Solana Summit Germany" [ref=e7] [cursor=pointer] [box=32,20,232,104]:
+          - /url: /solana-summit-germany
+        - generic [ref=e9] [box=830,46,551,52]
+      - generic [ref=e16] [box=0,0,1440,1200]:
+        - paragraph [ref=e17] [box=579,489,283,30]: 13 June 2026 / Berlin
+        - heading "Solana Summit Germany" [level=1] [ref=e18] [box=294,539,852,86]
+        - link "Request to Join" [ref=e19] [cursor=pointer] [box=525,657,390,54]:
+          - /url: https://luma.com/solanasummitgermany
+    - generic [ref=e24] [box=60,1312,1320,589]:
+      - heading "Event details" [level=2] [ref=e25] [box=60,1312,1320,76]
+      - generic [ref=e27] [box=60,1469,1320,432]:
+        - generic [ref=e28] [box=60,1469,520,432]
+        - iframe [ref=e42] [box=636,1501,744,400]:
+          
+    - generic [ref=e44] [box=0,2157,1440,361]:
+      - paragraph [ref=e45] [box=60,2157,1320,20]: Full Day Conference
+      - heading "Explore the Agenda" [level=2] [ref=e46] [box=290,2197,860,71]
+      - paragraph [ref=e47] [box=380,2296,680,28]: Keynotes, panels, firesides, live formats, and networking for the Solana ecosystem in Germany.
+      - generic [ref=e48] [box=540,2364,360,66]:
+        - generic [ref=e49] [box=540,2364,99,66]
+        - generic [ref=e52] [box=671,2364,99,66]
+        - generic [ref=e55] [box=801,2364,99,66]
+      - paragraph [ref=e58] [box=490,2478,460,40]: Full agenda will be announced one week before the summit.
+    - generic [ref=e61] [box=60,2774,1320,2282]:
+      - generic [ref=e62] [box=60,2774,1320,2176]:
+        - generic [ref=e63] [box=60,2774,1320,117]
+        - generic [ref=e68] [box=60,2931,1320,2019]
+      - link "Apply to Speak" [ref=e546] [cursor=pointer] [box=60,5014,226,42]:
+        - /url: https://forms.gle/peqH3eHMpxkpW5G9A
+        - generic [ref=e547] [box=93,5025,160,20]
+    - generic [ref=e551] [box=60,5280,1320,901]:
+      - generic [ref=e552] [box=60,5280,1320,117]:
+        - heading "Partners" [level=2] [ref=e553] [box=60,5280,253,76]
+        - link "Become a Partner" [ref=e554] [cursor=pointer] [box=1133,5292,247,52]:
+          - /url: https://forms.gle/CdMwQcC4SBUiX6Cn9
+      - generic [ref=e557] [box=160,5445,1120,736]:
+        - generic [ref=e558] [box=160,5445,1120,292]
+        - generic [ref=e565] [box=160,5817,1120,364]
+    - generic [ref=e580] [box=60,6405,1320,533]:
+      - heading "FAQ" [level=2] [ref=e581] [box=60,6405,1320,76]
+      - generic [ref=e583] [box=350,6562,740,376]:
+        - group [ref=e584] [box=350,6562,740,133]
+        - group [ref=e590] [box=350,6695,740,81]
+        - group [ref=e595] [box=350,6776,740,81]
+        - group [ref=e600] [box=350,6857,740,81]
+    - generic [ref=e607] [box=60,7162,1320,447]:
+      - heading "Getting there" [level=2] [ref=e608] [box=60,7162,1320,76]
+      - generic [ref=e610] [box=340,7319,760,290]:
+        - generic [ref=e611] [box=340,7320,760,79]
+        - generic [ref=e614] [box=340,7399,760,210]
+    - generic [ref=e623] [box=240,7887,960,439]:
+      - heading "Don't miss SOLANA SUMMIT GERMANY" [level=2] [ref=e624] [box=240,7887,960,272]:
+        - text: Don't miss
+        - text: SOLANA SUMMIT GERMANY
+      - link "Request to Join" [ref=e625] [cursor=pointer] [box=525,8207,390,58]:
+        - /url: https://luma.com/solanasummitgermany
+        - generic [ref=e626] [box=553,8225,334,23]
+      - img "Powered by Superteam" [ref=e628] [box=635,8313,170,13]
+  - alert [ref=e629] [box=-1,8448,1,1]

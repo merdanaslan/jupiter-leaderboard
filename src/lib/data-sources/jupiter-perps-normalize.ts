@@ -2,6 +2,7 @@ import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 import type { OpenTrade, RecentTrade, TradeMarket, TradeSide } from "../types";
 import {
+  calculatePositionPnlUsd,
   calculateWalletFeeSummary,
   calculateWalletUnrealizedPnlUsd,
   type PricesByMarket,
@@ -61,11 +62,17 @@ export interface JupiterPerpsTradeEvent {
   signature: string;
   slot: number;
   blockTime: number | null;
+  instructionIndex?: number;
   owner: string;
   position: string;
   market: TradeMarket | "UNKNOWN";
   side: TradeSide | "unknown";
   notionalUsd: number;
+  collateralUsdDelta?: number;
+  positionSizeUsd?: number;
+  positionCollateralUsd?: number;
+  originalPositionCollateralUsd?: number;
+  positionEntryPriceUsd?: number;
   feeUsd: number;
   positionFeeUsd?: number;
   fundingFeeUsd?: number;
@@ -98,6 +105,8 @@ export interface JupiterPerpsOpenPosition {
   entryPriceUsd: number;
   realisedPnlUsd: number;
   cumulativeInterestSnapshot?: number;
+  unrealizedPnlUsd?: number;
+  markPriceUsd?: number;
   openTime: number;
   updateTime: number;
 }
@@ -345,11 +354,17 @@ export function normalizeTradeEvent(event: DecodedPerpsEvent): JupiterPerpsTrade
     signature: event.signature,
     slot: event.slot,
     blockTime: event.blockTime,
+    instructionIndex: event.instructionIndex,
     owner,
     position,
     market: marketFromCustody(data.positionCustody),
     side: sideByteToString(data.positionSide),
-    notionalUsd: bnToNumber(data.sizeUsdDelta),
+    notionalUsd: "sizeUsdDelta" in data ? bnToNumber(data.sizeUsdDelta) : bnToNumber(data.positionSizeUsd),
+    collateralUsdDelta: "collateralUsdDelta" in data ? bnToNumber(data.collateralUsdDelta) : undefined,
+    positionSizeUsd: "positionSizeUsd" in data ? bnToNumber(data.positionSizeUsd) : undefined,
+    positionCollateralUsd: "positionCollateralUsd" in data ? bnToNumber(data.positionCollateralUsd) : undefined,
+    originalPositionCollateralUsd: "originalPositionCollateralUsd" in data ? bnToNumber(data.originalPositionCollateralUsd) : undefined,
+    positionEntryPriceUsd: "positionPrice" in data ? bnToNumber(data.positionPrice) : undefined,
     feeUsd: bnToNumber(data.feeUsd),
     positionFeeUsd: bnToNumber(data.positionFeeUsd),
     fundingFeeUsd: bnToNumber(data.fundingFeeUsd),
@@ -395,6 +410,18 @@ export function buildWalletSnapshot(input: {
   syntheticOpenPositionVolumeUsd?: number;
   currentTimeSeconds?: number;
 }): JupiterPerpsWalletSnapshot {
+  const positions = input.positions.map((position) => {
+    if (position.market === "UNKNOWN") return position;
+
+    const markPriceUsd = input.pricesByMarket?.[position.market];
+    if (!markPriceUsd) return position;
+
+    return {
+      ...position,
+      markPriceUsd,
+      unrealizedPnlUsd: calculatePositionPnlUsd(position, markPriceUsd),
+    };
+  });
   const tradeNotionalVolumeUsd = input.trades.reduce((sum, trade) => sum + Math.abs(trade.notionalUsd), 0);
   const positionsWithIncreaseTrade = new Set(
     input.trades
@@ -403,16 +430,16 @@ export function buildWalletSnapshot(input: {
   );
   const inferredOpenPositionVolumeUsd =
     input.syntheticOpenPositionVolumeUsd ??
-    input.positions
+    positions
       .filter((position) => !positionsWithIncreaseTrade.has(position.pubkey))
       .reduce((sum, position) => sum + Math.abs(position.sizeUsd), 0);
-  const openPositionNotionalUsd = input.positions.reduce((sum, position) => sum + Math.abs(position.sizeUsd), 0);
-  const collateralUsd = input.positions.reduce((sum, position) => sum + position.collateralUsd, 0);
+  const openPositionNotionalUsd = positions.reduce((sum, position) => sum + Math.abs(position.sizeUsd), 0);
+  const collateralUsd = positions.reduce((sum, position) => sum + position.collateralUsd, 0);
   const notionalVolumeUsd = tradeNotionalVolumeUsd + inferredOpenPositionVolumeUsd;
   const realizedPnlUsd = input.trades.reduce((sum, trade) => sum + trade.pnlUsd, 0);
-  const unrealizedPnlUsd = calculateWalletUnrealizedPnlUsd(input.positions, input.pricesByMarket);
+  const unrealizedPnlUsd = calculateWalletUnrealizedPnlUsd(positions, input.pricesByMarket);
   const fees = calculateWalletFeeSummary({
-    positions: input.positions,
+    positions,
     trades: input.trades,
     custodyConfigsByAddress: input.custodyConfigsByAddress,
     currentTimeSeconds: input.currentTimeSeconds,
@@ -420,11 +447,11 @@ export function buildWalletSnapshot(input: {
   const grossPnlUsd = realizedPnlUsd + unrealizedPnlUsd;
   const netPnlUsd = grossPnlUsd - fees.totalFeesUsd;
   const latestTrade = [...input.trades].sort((a, b) => b.slot - a.slot || b.signature.localeCompare(a.signature)).at(0);
-  const largestPosition = [...input.positions].sort((a, b) => b.sizeUsd - a.sizeUsd)[0];
+  const largestPosition = [...positions].sort((a, b) => b.sizeUsd - a.sizeUsd)[0];
 
   return {
     walletAddress: input.walletAddress,
-    positions: input.positions,
+    positions,
     trades: input.trades,
     triggerOrders: input.triggerOrders ?? [],
     triggerOrdersUnavailable: input.triggerOrdersUnavailable,

@@ -142,6 +142,7 @@ export class JupiterPerpsLiveTracker {
       walletAddresses: this.walletAddresses,
       sinceUnixSeconds: this.options.sinceUnixSeconds,
       signatureLimit: this.options.signatureLimit,
+      positionRequestSignatureLimit: this.options.signatureLimit,
       includeClosedPositions: this.options.includeClosedPositions,
       pricesByMarket: this.pricesByMarket,
     });

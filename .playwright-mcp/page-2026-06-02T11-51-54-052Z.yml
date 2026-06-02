@@ -1,0 +1,599 @@
+- generic [active] [ref=e1]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - navigation [ref=e6]:
+        - link "Solana Summit Germany" [ref=e7] [cursor=pointer]:
+          - /url: /solana-summit-germany
+          - img "Solana Summit Germany" [ref=e8]
+        - generic [ref=e9]:
+          - link "Speakers" [ref=e10] [cursor=pointer]:
+            - /url: /solana-summit-germany#speakers
+          - link "Partners" [ref=e11] [cursor=pointer]:
+            - /url: /solana-summit-germany#partners
+          - link "FAQ" [ref=e12] [cursor=pointer]:
+            - /url: /solana-summit-germany#faq
+          - link "Request to Join" [ref=e13] [cursor=pointer]:
+            - /url: https://luma.com/solanasummitgermany
+            - generic [ref=e14]:
+              - text: Request to Join
+              - generic [ref=e15]: ↗
+      - generic [ref=e16]:
+        - paragraph [ref=e17]: 13 June 2026 / Berlin
+        - heading "Solana Summit Germany" [level=1] [ref=e18]
+        - link "Request to Join" [ref=e19] [cursor=pointer]:
+          - /url: https://luma.com/solanasummitgermany
+          - generic [ref=e20]:
+            - text: Request to Join
+            - generic [ref=e21]: ↗
+    - generic [ref=e24]:
+      - heading "Event details" [level=2] [ref=e25]
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - paragraph [ref=e30]: Date
+            - paragraph [ref=e32]: 13 June 2026
+          - generic [ref=e33]:
+            - paragraph [ref=e34]: Venue
+            - generic [ref=e35]:
+              - paragraph [ref=e36]: Spreespeicher, Berlin
+              - paragraph [ref=e37]: Stralauer Allee 2, 10245 Berlin
+          - generic [ref=e38]:
+            - paragraph [ref=e39]: Time
+            - paragraph [ref=e41]: 10:00-22:00
+        - iframe [ref=e42]:
+          
+    - generic [ref=e44]:
+      - paragraph [ref=e45]: Full Day Conference
+      - heading "Explore the Agenda" [level=2] [ref=e46]
+      - paragraph [ref=e47]: Keynotes, panels, firesides, live formats, and networking for the Solana ecosystem in Germany.
+      - generic [ref=e48]:
+        - generic [ref=e49]:
+          - paragraph [ref=e50]: 30+
+          - paragraph [ref=e51]: Sessions
+        - generic [ref=e52]:
+          - paragraph [ref=e53]: 40+
+          - paragraph [ref=e54]: Speakers
+        - generic [ref=e55]:
+          - paragraph [ref=e56]: "1"
+          - paragraph [ref=e57]: Full day
+      - paragraph [ref=e58]: Full agenda will be announced one week before the summit.
+    - generic [ref=e61]:
+      - generic [ref=e62]:
+        - generic [ref=e63]:
+          - heading "Speakers" [level=2] [ref=e64]
+          - generic [ref=e65]:
+            - generic [ref=e66]: Search speakers
+            - img
+            - searchbox "Search speakers" [ref=e67]
+        - generic [ref=e68]:
+          - article [ref=e69]:
+            - img "Patricia Albrecht" [ref=e71]
+            - heading "Patricia Albrecht" [level=3] [ref=e74]:
+              - text: Patricia
+              - text: Albrecht
+            - generic [ref=e75]:
+              - paragraph [ref=e76]: Superteam Germany
+              - link "Patricia Albrecht on X" [ref=e77] [cursor=pointer]:
+                - /url: https://x.com/pattiruss_
+                - img [ref=e78]
+            - paragraph [ref=e80]: Lead
+          - article [ref=e81]:
+            - img "Mert Mumtaz" [ref=e83]
+            - heading "Mert Mumtaz" [level=3] [ref=e86]:
+              - text: Mert
+              - text: Mumtaz
+            - generic [ref=e87]:
+              - paragraph [ref=e88]: Helius
+              - link "Mert Mumtaz on X" [ref=e89] [cursor=pointer]:
+                - /url: https://x.com/mert
+                - img [ref=e90]
+            - paragraph [ref=e92]: Co-Founder & CEO
+          - article [ref=e93]:
+            - img "Xiao-Xiao Zhu" [ref=e95]
+            - heading "Xiao-Xiao Zhu" [level=3] [ref=e98]:
+              - text: Xiao-Xiao
+              - text: Zhu
+            - generic [ref=e99]:
+              - paragraph [ref=e100]: Jupiter
+              - link "Xiao-Xiao Zhu on X" [ref=e101] [cursor=pointer]:
+                - /url: https://x.com/xxjzhu
+                - img [ref=e102]
+            - paragraph [ref=e104]: President
+          - article [ref=e105]:
+            - img "Aditya Shetty" [ref=e107]
+            - heading "Aditya Shetty" [level=3] [ref=e110]:
+              - text: Aditya
+              - text: Shetty
+            - generic [ref=e111]:
+              - paragraph [ref=e112]: Superteam
+              - link "Aditya Shetty on X" [ref=e113] [cursor=pointer]:
+                - /url: https://x.com/adityashetts
+                - img [ref=e114]
+            - paragraph [ref=e116]: Lead
+          - article [ref=e117]:
+            - img "Yannik Schrade" [ref=e119]
+            - heading "Yannik Schrade" [level=3] [ref=e122]:
+              - text: Yannik
+              - text: Schrade
+            - generic [ref=e123]:
+              - paragraph [ref=e124]: Arcium
+              - link "Yannik Schrade on X" [ref=e125] [cursor=pointer]:
+                - /url: https://x.com/yrschrade
+                - img [ref=e126]
+            - paragraph [ref=e128]: Co-Founder & CEO
+          - article [ref=e129]:
+            - img "Vidor Gencel" [ref=e131]
+            - heading "Vidor Gencel" [level=3] [ref=e134]:
+              - text: Vidor
+              - text: Gencel
+            - generic [ref=e135]:
+              - paragraph [ref=e136]: Solflare
+              - link "Vidor Gencel on X" [ref=e137] [cursor=pointer]:
+                - /url: https://x.com/vidor_solflare
+                - img [ref=e138]
+            - paragraph [ref=e140]: Co-Founder
+          - article [ref=e141]:
+            - img "Jessica" [ref=e143]
+            - heading "Jessica" [level=3] [ref=e146]
+            - generic [ref=e147]:
+              - paragraph [ref=e148]: SOL Strategies
+              - link "Jessica on X" [ref=e149] [cursor=pointer]:
+                - /url: https://x.com/yesjess
+                - img [ref=e150]
+            - paragraph [ref=e152]: Growth
+          - article [ref=e153]:
+            - img "Eno" [ref=e155]
+            - heading "Eno" [level=3] [ref=e158]
+            - generic [ref=e159]:
+              - paragraph [ref=e160]: Sol Brothers
+              - link "Eno on X" [ref=e161] [cursor=pointer]:
+                - /url: https://x.com/YouKnowEno
+                - img [ref=e162]
+            - paragraph [ref=e164]: Co-Founder
+          - article [ref=e165]:
+            - img "Patrick Hansen" [ref=e167]
+            - heading "Patrick Hansen" [level=3] [ref=e170]:
+              - text: Patrick
+              - text: Hansen
+            - generic [ref=e171]:
+              - paragraph [ref=e172]: Circle
+              - link "Patrick Hansen on X" [ref=e173] [cursor=pointer]:
+                - /url: https://x.com/paddi_hansen
+                - img [ref=e174]
+            - paragraph [ref=e176]: Senior Director, EU Strategy & Policy
+          - article [ref=e177]:
+            - img "Jan-Oliver Sell" [ref=e179]
+            - heading "Jan-Oliver Sell" [level=3] [ref=e182]:
+              - text: Jan-Oliver
+              - text: Sell
+            - generic [ref=e183]:
+              - paragraph [ref=e184]: Qivalis
+              - link "Jan-Oliver Sell on X" [ref=e185] [cursor=pointer]:
+                - /url: https://x.com/JanOSell
+                - img [ref=e186]
+            - paragraph [ref=e188]: CEO
+          - article [ref=e189]:
+            - img "Peter Grosskopf" [ref=e191]
+            - heading "Peter Grosskopf" [level=3] [ref=e194]:
+              - text: Peter
+              - text: Grosskopf
+            - generic [ref=e195]:
+              - paragraph [ref=e196]: AllUnity
+              - link "Peter Grosskopf on X" [ref=e197] [cursor=pointer]:
+                - /url: https://x.com/peterlih
+                - img [ref=e198]
+            - paragraph [ref=e200]: CTO/COO
+          - article [ref=e201]:
+            - img "Carlo Abdel-Nour" [ref=e203]
+            - heading "Carlo Abdel-Nour" [level=3] [ref=e206]:
+              - text: Carlo
+              - text: Abdel-Nour
+            - generic [ref=e207]:
+              - paragraph [ref=e208]: Superteam Germany
+              - link "Carlo Abdel-Nour on X" [ref=e209] [cursor=pointer]:
+                - /url: https://x.com/zCase_
+                - img [ref=e210]
+            - paragraph [ref=e212]: Community Lead
+          - article [ref=e213]:
+            - img "Radoslav Albrecht" [ref=e215]
+            - heading "Radoslav Albrecht" [level=3] [ref=e218]:
+              - text: Radoslav
+              - text: Albrecht
+            - generic [ref=e219]:
+              - paragraph [ref=e220]: Bitbond
+              - link "Radoslav Albrecht on X" [ref=e221] [cursor=pointer]:
+                - /url: https://x.com/RadkoAlbrecht
+                - img [ref=e222]
+            - paragraph [ref=e224]: Founder & CEO
+          - article [ref=e225]:
+            - img "Merdan Aslan" [ref=e227]
+            - heading "Merdan Aslan" [level=3] [ref=e230]:
+              - text: Merdan
+              - text: Aslan
+            - generic [ref=e231]:
+              - paragraph [ref=e232]: Superteam Germany
+              - link "Merdan Aslan on X" [ref=e233] [cursor=pointer]:
+                - /url: https://x.com/merdussss
+                - img [ref=e234]
+            - paragraph [ref=e236]: Developer Relations
+          - article [ref=e237]:
+            - img "Ulrike Lierow Schad" [ref=e239]
+            - heading "Ulrike Lierow Schad" [level=3] [ref=e242]:
+              - text: Ulrike
+              - text: Lierow Schad
+            - paragraph [ref=e244]: CVVC / Bundesblock
+            - paragraph [ref=e245]: MD Berlin - CV Labs | Politics - Bundesblock
+          - article [ref=e246]:
+            - img "Waddah Drobi" [ref=e248]
+            - heading "Waddah Drobi" [level=3] [ref=e251]:
+              - text: Waddah
+              - text: Drobi
+            - generic [ref=e252]:
+              - paragraph [ref=e253]: Solana Foundation
+              - link "Waddah Drobi on X" [ref=e254] [cursor=pointer]:
+                - /url: https://x.com/0xWaldrobi
+                - img [ref=e255]
+            - paragraph [ref=e257]: Data
+          - article [ref=e258]:
+            - img "Nick Almond" [ref=e260]
+            - heading "Nick Almond" [level=3] [ref=e263]:
+              - text: Nick
+              - text: Almond
+            - generic [ref=e264]:
+              - paragraph [ref=e265]: Jito
+              - link "Nick Almond on X" [ref=e266] [cursor=pointer]:
+                - /url: https://x.com/DrNickA
+                - img [ref=e267]
+            - paragraph [ref=e269]: Head of Governance
+          - article [ref=e270]:
+            - img "Tibor Tribus" [ref=e272]
+            - heading "Tibor Tribus" [level=3] [ref=e275]:
+              - text: Tibor
+              - text: Tribus
+            - generic [ref=e276]:
+              - paragraph [ref=e277]: FTMO
+              - link "Tibor Tribus on X" [ref=e278] [cursor=pointer]:
+                - /url: https://x.com/TiborTribus
+                - img [ref=e279]
+            - paragraph [ref=e281]: Head of Crypto
+          - article [ref=e282]:
+            - img "Sabs Sachdeva" [ref=e284]
+            - heading "Sabs Sachdeva" [level=3] [ref=e287]:
+              - text: Sabs
+              - text: Sachdeva
+            - generic [ref=e288]:
+              - paragraph [ref=e289]: Harmonic / Temporal
+              - link "Sabs Sachdeva on X" [ref=e290] [cursor=pointer]:
+                - /url: https://x.com/s4bs94
+                - img [ref=e291]
+            - paragraph [ref=e293]: Engineering
+          - article [ref=e294]:
+            - img "Alexandra K. Mikityuk" [ref=e296]
+            - heading "Alexandra K. Mikityuk" [level=3] [ref=e299]:
+              - text: Alexandra K.
+              - text: Mikityuk
+            - generic [ref=e300]:
+              - paragraph [ref=e301]: Staex
+              - link "Alexandra K. Mikityuk on X" [ref=e302] [cursor=pointer]:
+                - /url: https://x.com/alexandrastaex
+                - img [ref=e303]
+            - paragraph [ref=e305]: Co-Founder & CEO/CTO
+          - article [ref=e306]:
+            - img "Andreas Sack" [ref=e308]
+            - heading "Andreas Sack" [level=3] [ref=e311]:
+              - text: Andreas
+              - text: Sack
+            - paragraph [ref=e313]: Deka
+            - paragraph [ref=e314]: Lead Digital Assets Infrastructure
+          - article [ref=e315]:
+            - img "Vitor Py" [ref=e317]
+            - heading "Vitor Py" [level=3] [ref=e320]:
+              - text: Vitor
+              - text: Py
+            - generic [ref=e321]:
+              - paragraph [ref=e322]: SOL Strategies
+              - link "Vitor Py on X" [ref=e323] [cursor=pointer]:
+                - /url: https://x.com/vitorpy
+                - img [ref=e324]
+            - paragraph [ref=e326]: Director of Engineering
+          - article [ref=e327]:
+            - img "Tilo Carl Palfner" [ref=e329]
+            - heading "Tilo Carl Palfner" [level=3] [ref=e332]:
+              - text: Tilo Carl
+              - text: Palfner
+            - generic [ref=e333]:
+              - paragraph [ref=e334]: Light Protocol
+              - link "Tilo Carl Palfner on X" [ref=e335] [cursor=pointer]:
+                - /url: https://x.com/tilo_cpn
+                - img [ref=e336]
+            - paragraph [ref=e338]: Director Operations & Developer Relations
+          - article [ref=e339]:
+            - img "Voshy Ivosevic" [ref=e341]
+            - heading "Voshy Ivosevic" [level=3] [ref=e344]:
+              - text: Voshy
+              - text: Ivosevic
+            - generic [ref=e345]:
+              - paragraph [ref=e346]: Greed Academy / Lucid Drakes
+              - link "Voshy Ivosevic on X" [ref=e347] [cursor=pointer]:
+                - /url: https://x.com/voshy
+                - img [ref=e348]
+            - paragraph [ref=e350]: Co-Founder & CEO
+          - article [ref=e351]:
+            - img "Tristan Hundley" [ref=e353]
+            - heading "Tristan Hundley" [level=3] [ref=e356]:
+              - text: Tristan
+              - text: Hundley
+            - generic [ref=e357]:
+              - paragraph [ref=e358]: Decen Space
+              - link "Tristan Hundley on X" [ref=e359] [cursor=pointer]:
+                - /url: https://x.com/spacetristan
+                - img [ref=e360]
+            - paragraph [ref=e362]: Founder
+          - article [ref=e363]:
+            - img "Phillip" [ref=e365]
+            - heading "Phillip" [level=3] [ref=e368]
+            - generic [ref=e369]:
+              - paragraph [ref=e370]: Crafts
+              - link "Phillip on X" [ref=e371] [cursor=pointer]:
+                - /url: https://x.com/pfo_sac
+                - img [ref=e372]
+            - paragraph [ref=e374]: Co-Founder
+          - article [ref=e375]:
+            - img "Max von Wallenberg" [ref=e377]
+            - heading "Max von Wallenberg" [level=3] [ref=e380]:
+              - text: Max von
+              - text: Wallenberg
+            - generic [ref=e381]:
+              - paragraph [ref=e382]: MoonPay · Iron
+              - link "Max von Wallenberg on X" [ref=e383] [cursor=pointer]:
+                - /url: https://x.com/maxwallenberg
+                - img [ref=e384]
+            - paragraph [ref=e386]: Stablecoins · Founder & CEO
+          - article [ref=e387]:
+            - img "Chris Grundy" [ref=e389]
+            - heading "Chris Grundy" [level=3] [ref=e392]:
+              - text: Chris
+              - text: Grundy
+            - generic [ref=e393]:
+              - paragraph [ref=e394]: OKX
+              - link "Chris Grundy on X" [ref=e395] [cursor=pointer]:
+                - /url: https://x.com/grundy_10
+                - img [ref=e396]
+            - paragraph [ref=e398]: Head of Product Marketing
+          - article [ref=e399]:
+            - img "Thomas Gehrmann" [ref=e401]
+            - heading "Thomas Gehrmann" [level=3] [ref=e404]:
+              - text: Thomas
+              - text: Gehrmann
+            - generic [ref=e405]:
+              - paragraph [ref=e406]: Mato
+              - link "Thomas Gehrmann on X" [ref=e407] [cursor=pointer]:
+                - /url: https://x.com/thgehr
+                - img [ref=e408]
+            - paragraph [ref=e410]: Co-Founder
+          - article [ref=e411]:
+            - img "Goldie G" [ref=e413]
+            - heading "Goldie G" [level=3] [ref=e416]:
+              - text: Goldie
+              - text: G
+            - generic [ref=e417]:
+              - paragraph [ref=e418]: dopamyn.fun
+              - link "Goldie G on X" [ref=e419] [cursor=pointer]:
+                - /url: https://x.com/innitgoldie
+                - img [ref=e420]
+            - paragraph [ref=e422]: Co-Founder
+          - article [ref=e423]:
+            - img "Newton Davis" [ref=e425]
+            - heading "Newton Davis" [level=3] [ref=e428]:
+              - text: Newton
+              - text: Davis
+            - generic [ref=e429]:
+              - paragraph [ref=e430]: Janus
+              - link "Newton Davis on X" [ref=e431] [cursor=pointer]:
+                - /url: https://x.com/launchnoodles
+                - img [ref=e432]
+            - paragraph [ref=e434]: Co-Founder
+          - article [ref=e435]:
+            - img "João Martins" [ref=e437]
+            - heading "João Martins" [level=3] [ref=e440]:
+              - text: João
+              - text: Martins
+            - generic [ref=e441]:
+              - paragraph [ref=e442]: Housd
+              - link "João Martins on X" [ref=e443] [cursor=pointer]:
+                - /url: https://x.com/stmartinmaxing
+                - img [ref=e444]
+            - paragraph [ref=e446]: Co-Founder
+          - article [ref=e447]:
+            - img "Noah Haufer" [ref=e449]
+            - heading "Noah Haufer" [level=3] [ref=e452]:
+              - text: Noah
+              - text: Haufer
+            - generic [ref=e453]:
+              - paragraph [ref=e454]: SolRouter
+              - link "Noah Haufer on X" [ref=e455] [cursor=pointer]:
+                - /url: https://x.com/GhostHash1
+                - img [ref=e456]
+            - paragraph [ref=e458]: Co-Founder
+          - article [ref=e459]:
+            - img "Sangharsh Bhustalimath" [ref=e461]
+            - heading "Sangharsh Bhustalimath" [level=3] [ref=e464]:
+              - text: Sangharsh
+              - text: Bhustalimath
+            - generic [ref=e465]:
+              - paragraph [ref=e466]: Stablecorp
+              - link "Sangharsh Bhustalimath on X" [ref=e467] [cursor=pointer]:
+                - /url: https://x.com/10KRotator
+                - img [ref=e468]
+            - paragraph [ref=e470]: Co-Founder
+          - article [ref=e471]:
+            - img "Alexander Kujavsky" [ref=e473]
+            - heading "Alexander Kujavsky" [level=3] [ref=e476]:
+              - text: Alexander
+              - text: Kujavsky
+            - generic [ref=e477]:
+              - paragraph [ref=e478]: MultiHopper
+              - link "Alexander Kujavsky on X" [ref=e479] [cursor=pointer]:
+                - /url: https://x.com/kujcrypto
+                - img [ref=e480]
+            - paragraph [ref=e482]: Co-Founder
+          - article [ref=e483]:
+            - img "Mango Max" [ref=e485]
+            - heading "Mango Max" [level=3] [ref=e488]:
+              - text: Mango
+              - text: Max
+            - generic [ref=e489]:
+              - paragraph [ref=e490]: Bigwallet · Manifest
+              - link "Mango Max on X" [ref=e491] [cursor=pointer]:
+                - /url: https://x.com/m_schneider
+                - img [ref=e492]
+            - paragraph [ref=e494]: Co-Founder
+          - article [ref=e495]:
+            - img "Daniela Boback" [ref=e497]
+            - heading "Daniela Boback" [level=3] [ref=e500]:
+              - text: Daniela
+              - text: Boback
+            - paragraph [ref=e502]: Via
+            - paragraph [ref=e503]: Strategic Advisor
+          - article [ref=e504]:
+            - img "Erik Plauman" [ref=e506]
+            - heading "Erik Plauman" [level=3] [ref=e509]:
+              - text: Erik
+              - text: Plauman
+            - generic [ref=e510]:
+              - paragraph [ref=e511]: Bench
+              - link "Erik Plauman on X" [ref=e512] [cursor=pointer]:
+                - /url: https://x.com/herz0g
+                - img [ref=e513]
+            - paragraph [ref=e515]: Co-Founder
+          - article [ref=e516]:
+            - img "Tomas Eminger" [ref=e518]
+            - heading "Tomas Eminger" [level=3] [ref=e521]:
+              - text: Tomas
+              - text: Eminger
+            - generic [ref=e522]:
+              - paragraph [ref=e523]: Staking Facilities
+              - link "Tomas Eminger on X" [ref=e524] [cursor=pointer]:
+                - /url: https://x.com/EmiT87
+                - img [ref=e525]
+            - paragraph [ref=e527]: CTO
+          - article [ref=e528]:
+            - img "Erik Frank" [ref=e530]
+            - heading "Erik Frank" [level=3] [ref=e533]:
+              - text: Erik
+              - text: Frank
+            - paragraph [ref=e535]: LBBW
+            - paragraph [ref=e536]: Project Lead Digitization & Innovation
+          - article [ref=e537]:
+            - heading "Speaker TBA" [level=3] [ref=e542]:
+              - text: Speaker
+              - text: TBA
+            - paragraph [ref=e544]: More speakers
+            - paragraph [ref=e545]: To be announced
+      - link "Apply to Speak" [ref=e546] [cursor=pointer]:
+        - /url: https://forms.gle/peqH3eHMpxkpW5G9A
+        - generic [ref=e547]:
+          - text: Apply to Speak
+          - generic [ref=e548]: ↗
+    - generic [ref=e551]:
+      - generic [ref=e552]:
+        - heading "Partners" [level=2] [ref=e553]
+        - link "Become a Partner" [ref=e554] [cursor=pointer]:
+          - /url: https://forms.gle/CdMwQcC4SBUiX6Cn9
+          - generic [ref=e555]:
+            - text: Become a Partner
+            - generic [ref=e556]: ↗
+      - generic [ref=e557]:
+        - generic [ref=e558]:
+          - paragraph [ref=e559]: Gold Partners
+          - generic [ref=e560]:
+            - link "Visit Staking Facilities" [ref=e561] [cursor=pointer]:
+              - /url: https://stakingfacilities.com/
+              - img "Staking Facilities"
+            - link "Visit VIA" [ref=e562] [cursor=pointer]:
+              - /url: https://www.solvewithvia.com/
+              - img "VIA"
+            - link "Visit Arcium" [ref=e563] [cursor=pointer]:
+              - /url: https://arcium.com/
+              - img "Arcium"
+            - link "Visit Bags" [ref=e564] [cursor=pointer]:
+              - /url: https://bags.fm
+              - img "Bags"
+        - generic [ref=e565]:
+          - paragraph [ref=e566]: Community Partners
+          - generic [ref=e567]:
+            - link "Visit Tangem" [ref=e568] [cursor=pointer]:
+              - /url: https://tangem.com/en
+              - img "Tangem"
+            - link "Visit CUDIS" [ref=e569] [cursor=pointer]:
+              - /url: https://www.cudis.xyz/
+              - img "CUDIS"
+            - link "Visit Buddies for Paws" [ref=e570] [cursor=pointer]:
+              - /url: https://www.buddiesforpaws.org/
+              - img "Buddies for Paws"
+            - link "Visit Jupiter" [ref=e571] [cursor=pointer]:
+              - /url: https://jup.ag/
+              - img "Jupiter" [ref=e572]
+            - link "Visit Solana Spaces" [ref=e573] [cursor=pointer]:
+              - /url: https://solanaspaces.com/
+              - img "Solana Spaces"
+            - link "Visit Seeker" [ref=e574] [cursor=pointer]:
+              - /url: https://solanamobile.com/seeker
+              - img "Seeker"
+            - link "Visit Superteam Talent" [ref=e575] [cursor=pointer]:
+              - /url: https://talent.superteam.fun/
+              - img "Superteam Talent"
+            - link "Visit Solyd" [ref=e576] [cursor=pointer]:
+              - /url: https://solyd.store/
+              - img "Solyd"
+            - link "Visit Pudgy Penguins" [ref=e577] [cursor=pointer]:
+              - /url: https://www.pudgypenguins.com/
+              - img "Pudgy Penguins"
+    - generic [ref=e580]:
+      - heading "FAQ" [level=2] [ref=e581]
+      - generic [ref=e583]:
+        - group [ref=e584]:
+          - generic "Is the summit free to attend?" [ref=e585] [cursor=pointer]:
+            - text: Is the summit free to attend?
+            - img [ref=e587]
+          - paragraph [ref=e589]: Yes. Attendance is free, but registration is approval-based because capacity is limited.
+        - group [ref=e590]:
+          - generic "Who should request to join?" [ref=e591] [cursor=pointer]:
+            - text: Who should request to join?
+            - img [ref=e593]
+        - group [ref=e595]:
+          - generic "Where is the summit happening?" [ref=e596] [cursor=pointer]:
+            - text: Where is the summit happening?
+            - img [ref=e598]
+        - group [ref=e600]:
+          - generic "Is there a dress code?" [ref=e601] [cursor=pointer]:
+            - text: Is there a dress code?
+            - img [ref=e603]
+    - generic [ref=e607]:
+      - heading "Getting there" [level=2] [ref=e608]
+      - generic [ref=e610]:
+        - generic [ref=e611]:
+          - paragraph [ref=e612]: Nearest airport
+          - paragraph [ref=e613]: Berlin Brandenburg Airport (BER)
+        - generic [ref=e614]:
+          - paragraph [ref=e615]: Accommodations
+          - generic [ref=e616]:
+            - paragraph [ref=e617]: "Recommended nearby hotels:"
+            - generic [ref=e618]:
+              - link "Hotel nhow Berlin" [ref=e619] [cursor=pointer]:
+                - /url: https://www.nhow-hotels.com/en/nhow-berlin
+              - link "Michelberger Hotel" [ref=e620] [cursor=pointer]:
+                - /url: https://www.michelbergerhotel.com/en/rooms
+              - link "Indigo Hotel" [ref=e621] [cursor=pointer]:
+                - /url: https://www.ihg.com/hotelindigo/hotels/gb/en/berlin/beres/hoteldetail?cm_mmc=GoogleMaps-_-IN-_-DE-_-BERES
+    - generic [ref=e623]:
+      - heading "Don't miss SOLANA SUMMIT GERMANY" [level=2] [ref=e624]:
+        - text: Don't miss
+        - text: SOLANA SUMMIT GERMANY
+      - link "Request to Join" [ref=e625] [cursor=pointer]:
+        - /url: https://luma.com/solanasummitgermany
+        - generic [ref=e626]:
+          - text: Request to Join
+          - generic [ref=e627]: ↗
+      - img "Powered by Superteam" [ref=e628]
+  - alert [ref=e629]

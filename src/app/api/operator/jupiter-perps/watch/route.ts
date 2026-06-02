@@ -115,6 +115,7 @@ export async function GET(request: Request) {
           ? new JupiterPerpsSolstreamLiveTracker(client, {
               ...commonTrackerOptions,
               fromSlot: query.data.fromSlot,
+              continueOnInitialSnapshotError: true,
               onError: (error) => {
                 send("error", {
                   message: error instanceof Error ? error.message : "Unable to watch Solstream snapshots",
