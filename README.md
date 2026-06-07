@@ -238,7 +238,7 @@ npm run jupiter:sdk-reconstruct -- \
   --include-limit-orders
 ```
 
-The SDK reconstruction table shows rank, trader, net PnL, cup %, open-position %, equity, round volume, collateral, leverage, current open position, fee breakdown, active TP/SL count, optional active limit-order count, and recent activity. The recent activity section is intended for internal testing and final-mode display experiments: action, market, side, realized PnL for close/decrease/liquidation actions, size, token amount, execution price, fee, execution type, and shortened transaction signature.
+The SDK reconstruction table shows rank, trader, net PnL, cup %, open-position %, equity, round volume, collateral, leverage, current open position, fee breakdown, active TP/SL details, active limit-order details, and recent activity. The recent activity section is intended for internal testing and final-mode display experiments: action, market, side, realized PnL for close/decrease/liquidation actions, size, token amount, execution price, fee, execution type, and shortened transaction signature. For live polling runs, it also derives TP/SL and limit-order place/cancel activity by comparing active order state between polls.
 
 Use a fixed `START_TS` for competition tests. If omitted, the script uses a rolling `now - --since-minutes` window, which is useful for inspection but not correct for an official round.
 
@@ -250,7 +250,7 @@ Known SDK reconstruction limits:
 
 - It does not call the dedicated competition endpoint, so it reconstructs round state from per-wallet position and trade reads.
 - Filled trigger trades are exposed as `Trigger`; without an explicit TP/SL field in the SDK trade payload, the UI should label them as trigger executions rather than claiming exact TP vs SL after fill.
-- Active TP/SL requests are available from open positions, and active limit orders are available only when `--include-limit-orders` is used.
+- Active TP/SL requests are available from open positions, and active limit orders are available only when `--include-limit-orders` is used. TP/SL and limit-order create/cancel recent activity is derived from polling state changes, so it starts after the first observed poll and is approximate to the poll timestamp.
 - Trade rows include timestamps and transaction hashes but not Solana slots.
 - `trade.pnl` fee semantics should still be confirmed with Jupiter before making the SDK reconstruction path official for prize settlement.
 

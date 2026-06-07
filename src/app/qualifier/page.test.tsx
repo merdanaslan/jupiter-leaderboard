@@ -1,5 +1,6 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SummitQualifierPage } from "@/components/leaderboard/summit-qualifier-page";
 import QualifierPage from "./page";
 
 describe("QualifierPage", () => {
@@ -12,6 +13,7 @@ describe("QualifierPage", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -106,6 +108,43 @@ describe("QualifierPage", () => {
     expect(screen.getByText("-$2.40")).toBeInTheDocument();
     expect(screen.getByText("$87.90")).toBeInTheDocument();
     expect(screen.queryByText("Reconnecting")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("can simulate live qualifier updates without fetching backend data", () => {
+    vi.useFakeTimers();
+
+    render(<SummitQualifierPage mockLive />);
+
+    expect(screen.getByRole("timer", { name: "Qualifier timer" })).toHaveTextContent(
+      "60:00",
+    );
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("@merdan");
+
+    act(() => {
+      vi.advanceTimersByTime(4_000);
+    });
+
+    expect(screen.getByRole("timer", { name: "Qualifier timer" })).toHaveTextContent(
+      "59:56",
+    );
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("@berlinbull");
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("#1");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("can shorten the qualifier mock timer for celebration testing", () => {
+    vi.useFakeTimers();
+
+    render(<SummitQualifierPage mockLive mockDurationSeconds={6} />);
+
+    act(() => {
+      vi.advanceTimersByTime(6_000);
+    });
+
+    expect(screen.getByRole("timer", { name: "Qualifier timer" })).toHaveTextContent(
+      "00:00",
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

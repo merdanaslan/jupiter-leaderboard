@@ -1,5 +1,6 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SummitFinalPage } from "@/components/leaderboard/summit-final-page";
 import FinalPage from "./page";
 
 describe("FinalPage", () => {
@@ -12,6 +13,7 @@ describe("FinalPage", () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -161,6 +163,40 @@ describe("FinalPage", () => {
     expect(container.querySelectorAll(".final-race-gap")).toHaveLength(0);
     expect(container.querySelector(".summit-final-side-patterns")).toBeInTheDocument();
     expect(screen.queryByText("Reconnecting")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("can simulate live final updates without fetching backend data", () => {
+    vi.useFakeTimers();
+
+    render(<SummitFinalPage mockLive />);
+
+    expect(screen.getByRole("timer", { name: "Final timer" })).toHaveTextContent("30:00");
+    expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("@merdan");
+
+    act(() => {
+      vi.advanceTimersByTime(6_000);
+    });
+
+    const finalistRows = screen.getAllByRole("listitem");
+    expect(screen.getByRole("timer", { name: "Final timer" })).toHaveTextContent("29:54");
+    expect(finalistRows[0]).toHaveTextContent("@juptrader");
+    expect(finalistRows[0]).toHaveTextContent("#1");
+    expect(finalistRows[0]).toHaveAttribute("data-accent", "gold");
+    expect(finalistRows).toHaveLength(4);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("can shorten the final mock timer for celebration testing", () => {
+    vi.useFakeTimers();
+
+    render(<SummitFinalPage mockLive mockDurationSeconds={6} />);
+
+    act(() => {
+      vi.advanceTimersByTime(6_000);
+    });
+
+    expect(screen.getByRole("timer", { name: "Final timer" })).toHaveTextContent("00:00");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -1,10 +1,24 @@
+"use client";
+
 import Image from "next/image";
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
+import {
+  formatSummitTimerFromPayload,
+  toSummitFinalRows,
+} from "@/lib/summit-live-leaderboard";
+import type { SummitFinalRow } from "@/lib/summit-live-leaderboard";
 import { cn } from "@/lib/utils";
+import {
+  useFlipListMovement,
+  useSummitMockDurationSeconds,
+  useSummitMockLeaderboardPayload,
+  useSummitMockLiveFlag,
+} from "./use-summit-mock-live";
+import { useSummitCelebrations } from "./use-summit-celebrations";
 
 const FINAL_TIMER = "30:00";
 
-const FINALISTS = [
+const STATIC_FINALISTS: Array<Omit<SummitFinalRow, "id">> = [
   {
     rank: 1,
     placement: "1st",
@@ -91,6 +105,11 @@ const FINALISTS = [
   },
 ] as const;
 
+const FINALISTS: SummitFinalRow[] = STATIC_FINALISTS.map((finalist) => ({
+  id: `final-${finalist.handle.replace(/^@/, "")}`,
+  ...finalist,
+}));
+
 const SIDE_PATTERN_SEGMENTS = [
   { id: 1, className: "summit-side-pattern-segment-1" },
   { id: 2, className: "summit-side-pattern-segment-2 summit-side-pattern-continuation" },
@@ -105,10 +124,29 @@ const FINAL_ROW_CLASSES = {
   mint: "final-row-mint",
 } as const;
 
-type Finalist = (typeof FINALISTS)[number];
+type Finalist = SummitFinalRow;
 type RecentTrade = Finalist["recent"];
 
-export function SummitFinalPage() {
+export function SummitFinalPage({
+  mockLive = false,
+  mockDurationSeconds,
+}: {
+  mockLive?: boolean;
+  mockDurationSeconds?: number;
+} = {}) {
+  const liveMode = useSummitMockLiveFlag(mockLive);
+  const liveMockDurationSeconds = useSummitMockDurationSeconds(mockDurationSeconds);
+  const livePayload = useSummitMockLeaderboardPayload(
+    "final",
+    liveMode,
+    liveMockDurationSeconds ? { durationSeconds: liveMockDurationSeconds } : undefined,
+  );
+  const finalists = liveMode ? toSummitFinalRows(livePayload.traders) : FINALISTS;
+  const timer = liveMode ? formatSummitTimerFromPayload(livePayload) : FINAL_TIMER;
+  const orderedFinalistIds = useMemo(() => finalists.map((finalist) => finalist.id), [finalists]);
+  const registerMovingRow = useFlipListMovement(orderedFinalistIds, liveMode);
+  useSummitCelebrations({ enabled: liveMode, mode: "final", payload: livePayload });
+
   return (
     <main className="summit-theme min-h-screen bg-black text-white">
       <section className="summit-qualifier-stage summit-final-stage relative min-h-[100svh] overflow-x-hidden bg-black">
@@ -155,7 +193,7 @@ export function SummitFinalPage() {
               Final time left
             </span>
             <span className="font-black leading-none tabular-nums text-[30px] sm:text-[38px] lg:text-[52px]">
-              {FINAL_TIMER}
+              {timer}
             </span>
           </div>
         </header>
@@ -169,8 +207,13 @@ export function SummitFinalPage() {
             aria-label="Final leaderboard"
             className="final-leaderboard-rows mx-auto flex w-full max-w-[1320px] flex-col gap-3 sm:gap-4 lg:gap-6 xl:gap-7"
           >
-            {FINALISTS.map((finalist) => (
-              <FinalRow key={finalist.placement} finalist={finalist} />
+            {finalists.map((finalist) => (
+              <FinalRow
+                key={finalist.id}
+                finalist={finalist}
+                rowRef={registerMovingRow(finalist.id)}
+                live={liveMode}
+              />
             ))}
           </div>
         </section>
@@ -224,13 +267,24 @@ function FinalBoardHeader() {
   );
 }
 
-function FinalRow({ finalist }: { finalist: Finalist }) {
+function FinalRow({
+  finalist,
+  rowRef,
+  live,
+}: {
+  finalist: Finalist;
+  rowRef: (node: HTMLElement | null) => void;
+  live: boolean;
+}) {
   return (
     <article
       role="listitem"
+      ref={rowRef}
       data-placement={finalist.placement}
       data-accent={finalist.accent}
       data-leader={finalist.rank === 1 ? "true" : "false"}
+      data-summit-trader-id={finalist.id}
+      data-live={live ? "true" : "false"}
       aria-label={`${finalist.placement} place, ${finalist.handle}`}
       className={cn(
         "final-board-row qualifier-board-row qualifier-row-glass grid min-h-[84px] grid-cols-[54px_minmax(0,1fr)_minmax(112px,auto)] items-center gap-x-2 gap-y-1.5 border px-3 py-2.5 transition-colors sm:min-h-[86px] sm:grid-cols-[86px_minmax(220px,1.35fr)_minmax(140px,0.75fr)_minmax(110px,0.55fr)_minmax(130px,0.65fr)_minmax(120px,0.6fr)_minmax(280px,1fr)] sm:gap-x-4 sm:px-6 lg:min-h-[92px]",

@@ -11,6 +11,14 @@ import type {
   SupportedMarketMint,
   Trade,
 } from "../node_modules/jupiter-perps-api-sdk/dist/index.js";
+import {
+  diffSdkOrderActivities,
+  formatSdkActiveOrderSummary,
+  mergeSdkOrderActivityHistory,
+  type SdkActiveOrderSnapshot,
+  type SdkActiveTpslRequest,
+  type SdkOrderActivity,
+} from "../src/lib/data-sources/jupiter-perps-sdk-activity";
 import { parseTraderConfig } from "../src/lib/trader-config";
 import type { CompetitionMode, TraderConfig } from "../src/lib/types";
 
@@ -18,7 +26,7 @@ loadEnvConfig(process.cwd());
 
 type SdkModule = typeof import("../node_modules/jupiter-perps-api-sdk/dist/index.js");
 type Market = "SOL" | "ETH" | "BTC";
-type RecentAction = "open" | "increase" | "decrease" | "close" | "liquidation";
+type RecentAction = "open" | "increase" | "decrease" | "close" | "liquidation" | "deposit" | "withdraw";
 type WalletFetchStatus = "ok" | "partial" | "error";
 
 const DEFAULT_BASE_URL = "https://perps-api.jup.ag/v1";
@@ -50,7 +58,8 @@ interface CliOptions {
   json: boolean;
 }
 
-interface RecentActivity {
+interface TradeRecentActivity {
+  kind: "trade";
   walletAddress: string;
   market: Market;
   side: "long" | "short";
@@ -64,6 +73,12 @@ interface RecentActivity {
   timestamp: number;
   signature: string;
 }
+
+interface OrderRecentActivity extends SdkOrderActivity {
+  kind: "order";
+}
+
+type RecentActivity = TradeRecentActivity | OrderRecentActivity;
 
 interface SdkReconstructedRow {
   rank: number;
@@ -91,7 +106,8 @@ interface SdkReconstructedRow {
   markPriceUsd?: number;
   openLabel: string;
   openPositionCount: number;
-  activeTpslRequests: Position["tpslRequests"];
+  activeOrderSnapshot: SdkActiveOrderSnapshot;
+  activeTpslRequests: SdkActiveTpslRequest[];
   activeTpslCount: number;
   activeLimitOrderCount: number;
   recentActivity?: RecentActivity;
@@ -123,9 +139,11 @@ async function main() {
   }
 
   let polls = 0;
+  const previousOrderSnapshots = new Map<string, SdkActiveOrderSnapshot>();
+  const orderActivityHistoryByWallet = new Map<string, OrderRecentActivity[]>();
   while (true) {
     polls += 1;
-    await pollOnce({ options, traderConfig, walletAddresses });
+    await pollOnce({ options, orderActivityHistoryByWallet, previousOrderSnapshots, traderConfig, walletAddresses });
 
     if (options.maxPolls > 0 && polls >= options.maxPolls) break;
     if (options.intervalMs <= 0) break;
@@ -136,6 +154,8 @@ async function main() {
 
 async function pollOnce(input: {
   options: CliOptions;
+  orderActivityHistoryByWallet: Map<string, OrderRecentActivity[]>;
+  previousOrderSnapshots: Map<string, SdkActiveOrderSnapshot>;
   traderConfig: TraderConfig[];
   walletAddresses: string[];
 }) {
@@ -149,8 +169,16 @@ async function pollOnce(input: {
       walletAddress,
     }),
   );
+  const orderActivitiesByWallet = buildOrderActivitiesByWallet({
+    historyByWallet: input.orderActivityHistoryByWallet,
+    historyLimit: Math.max(input.options.recentLimit, 20),
+    previousOrderSnapshots: input.previousOrderSnapshots,
+    snapshots,
+    timestamp: Math.floor(Date.now() / 1000),
+  });
 
   const rows = buildRows({
+    orderActivitiesByWallet,
     options: input.options,
     snapshots,
     startTimestamp,
@@ -306,7 +334,71 @@ async function retry<T>(fn: () => Promise<T>, options: CliOptions, label: string
   throw new Error(`${label} failed after ${maxAttempts} attempt${maxAttempts === 1 ? "" : "s"}: ${formatUnknownError(lastError)}`);
 }
 
+function buildOrderActivitiesByWallet(input: {
+  historyByWallet: Map<string, OrderRecentActivity[]>;
+  historyLimit: number;
+  previousOrderSnapshots: Map<string, SdkActiveOrderSnapshot>;
+  snapshots: WalletSnapshot[];
+  timestamp: number;
+}): Map<string, OrderRecentActivity[]> {
+  const activitiesByWallet = new Map<string, OrderRecentActivity[]>();
+
+  for (const snapshot of input.snapshots) {
+    const current = buildActiveOrderSnapshot(snapshot);
+    const walletAddress = normalizePublicKey(snapshot.walletAddress);
+    const previous = input.previousOrderSnapshots.get(walletAddress);
+    const activities = diffSdkOrderActivities(previous, current, input.timestamp).map(
+      (activity): OrderRecentActivity => ({
+        ...activity,
+        kind: "order",
+      }),
+    );
+
+    const existing = input.historyByWallet.get(walletAddress) ?? [];
+    const nextHistory = mergeSdkOrderActivityHistory(existing, activities, input.historyLimit) as OrderRecentActivity[];
+    if (nextHistory.length > 0) {
+      input.historyByWallet.set(walletAddress, nextHistory);
+      activitiesByWallet.set(walletAddress, nextHistory);
+    }
+    input.previousOrderSnapshots.set(walletAddress, current);
+  }
+
+  return activitiesByWallet;
+}
+
+function buildActiveOrderSnapshot(snapshot: WalletSnapshot): SdkActiveOrderSnapshot {
+  const openPositions = snapshot.positions.filter((position) => rawUsdToNumber(position.sizeUsd) > 0.005);
+
+  return {
+    limitOrders: snapshot.limitOrders
+      .filter((order) => !order.executed)
+      .map((order) => ({
+        collateralUsd: order.collateralUsd,
+        marketMint: order.marketMint,
+        maxSizeUsdDelta: order.maxSizeUsdDelta,
+        minSizeUsdDelta: order.minSizeUsdDelta,
+        positionRequestPubkey: order.positionRequestPubkey,
+        side: order.side,
+        sizeUsdDelta: order.sizeUsdDelta,
+        triggerPrice: order.triggerPrice,
+      })),
+    tpslRequests: openPositions.flatMap((position) =>
+      position.tpslRequests.map((request) => ({
+        entirePosition: request.entirePosition,
+        market: position.asset,
+        positionRequestPubkey: request.positionRequestPubkey,
+        side: position.side,
+        sizeUsd: rawUsdToNumber(request.sizeUsd),
+        triggerPriceUsd: request.triggerPriceUsd ? rawUsdToNumber(request.triggerPriceUsd) : 0,
+        type: request.requestType,
+      })),
+    ),
+    walletAddress: normalizePublicKey(snapshot.walletAddress),
+  };
+}
+
 function buildRows(input: {
+  orderActivitiesByWallet: Map<string, OrderRecentActivity[]>;
   options: CliOptions;
   snapshots: WalletSnapshot[];
   startTimestamp: number;
@@ -320,7 +412,16 @@ function buildRows(input: {
     const startingEquity = trader?.startingEquity ?? input.options.startingEquity;
     const openPositions = snapshot.positions.filter((position) => rawUsdToNumber(position.sizeUsd) > 0.005);
     const sortedTrades = sortTradesOldestFirst(snapshot.trades);
-    const recentActivities = buildRecentActivities(sortedTrades);
+    const activeOrderSnapshot = buildActiveOrderSnapshot(snapshot);
+    const tradeActivities = buildRecentActivities(sortedTrades);
+    const orderActivities = suppressFilledOrderCancels(
+      input.orderActivitiesByWallet.get(walletAddress) ?? [],
+      tradeActivities,
+    );
+    const recentActivities = [
+      ...tradeActivities,
+      ...orderActivities,
+    ].sort((a, b) => a.timestamp - b.timestamp);
     const primaryPosition = [...openPositions].sort(
       (a, b) => rawUsdToNumber(b.sizeUsd) - rawUsdToNumber(a.sizeUsd),
     )[0];
@@ -340,7 +441,8 @@ function buildRows(input: {
 
     return {
       activeLimitOrderCount: snapshot.limitOrders.filter((order) => !order.executed).length,
-      activeTpslRequests: openPositions.flatMap((position) => position.tpslRequests),
+      activeOrderSnapshot,
+      activeTpslRequests: activeOrderSnapshot.tpslRequests,
       activeTpslCount: openPositions.reduce((sum, position) => sum + position.tpslRequests.length, 0),
       borrowFeeUsd,
       collateralUsd,
@@ -384,7 +486,7 @@ function buildRows(input: {
     .map((row, index) => ({ ...row, rank: index + 1 }));
 }
 
-function buildRecentActivities(tradesOldestFirst: Trade[]): RecentActivity[] {
+function buildRecentActivities(tradesOldestFirst: Trade[]): TradeRecentActivity[] {
   const runningSizeByPosition = new Map<string, number>();
 
   return tradesOldestFirst.map((trade) => {
@@ -401,6 +503,7 @@ function buildRecentActivities(tradesOldestFirst: Trade[]): RecentActivity[] {
       executionPriceUsd,
       executionType: executionTypeForTrade(trade),
       feeUsd: decimalToNumber(trade.fee),
+      kind: "trade",
       market,
       realizedPnlUsd: realizedPnlForTradeOrNull(trade),
       side: trade.side,
@@ -413,13 +516,46 @@ function buildRecentActivities(tradesOldestFirst: Trade[]): RecentActivity[] {
   });
 }
 
+function suppressFilledOrderCancels(
+  orderActivities: OrderRecentActivity[],
+  tradeActivities: TradeRecentActivity[],
+): OrderRecentActivity[] {
+  return orderActivities.filter((activity) => !isFilledOrderCleanupCancel(activity, tradeActivities));
+}
+
+function isFilledOrderCleanupCancel(
+  activity: OrderRecentActivity,
+  tradeActivities: TradeRecentActivity[],
+): boolean {
+  if (activity.action !== "cancel") return false;
+
+  return tradeActivities.some((trade) => {
+    if (trade.executionType !== "trigger") return false;
+    if (trade.walletAddress !== activity.walletAddress) return false;
+    if (trade.market !== activity.market || trade.side !== activity.side) return false;
+    if (Math.abs(trade.timestamp - activity.timestamp) > 10) return false;
+
+    if (activity.orderKind !== "LIMIT") return true;
+    return isNearOrderTriggerPrice(activity.triggerPriceUsd, trade.executionPriceUsd);
+  });
+}
+
+function isNearOrderTriggerPrice(triggerPriceUsd: number, executionPriceUsd: number): boolean {
+  if (!Number.isFinite(triggerPriceUsd) || !Number.isFinite(executionPriceUsd)) return false;
+  const tolerance = Math.max(0.05, Math.abs(triggerPriceUsd) * 0.0005);
+  return Math.abs(triggerPriceUsd - executionPriceUsd) <= tolerance;
+}
+
 function inferRecentAction(trade: Trade, previousSizeUsd: number, sizeUsd: number): RecentAction {
   if (trade.orderType === "Liquidation") return "liquidation";
+  if (sizeUsd <= 0.005) {
+    return trade.action === "Increase" ? "deposit" : "withdraw";
+  }
   if (trade.action === "Increase") return previousSizeUsd > 0.005 ? "increase" : "open";
   return previousSizeUsd > 0.005 && previousSizeUsd - sizeUsd > 0.005 ? "decrease" : "close";
 }
 
-function executionTypeForTrade(trade: Trade): RecentActivity["executionType"] {
+function executionTypeForTrade(trade: Trade): TradeRecentActivity["executionType"] {
   if (trade.orderType === "Liquidation") return "liquidation";
   if (trade.orderType === "Trigger") return "trigger";
   return "market";
@@ -543,6 +679,7 @@ function renderTerminalLeaderboard(input: {
 
 function formatRecentSummary(activity: RecentActivity | undefined): string {
   if (!activity) return "--";
+  if (activity.kind === "order") return activity.summary;
   const pnl = activity.realizedPnlUsd === null ? "--" : formatSignedUsd(activity.realizedPnlUsd);
   return `${activity.action} ${activity.market} ${activity.side} ${pnl}`;
 }
@@ -552,6 +689,19 @@ function formatRecentActivityDetails(rows: SdkReconstructedRow[]): string {
     .filter((row) => row.recentActivities.length > 0)
     .map((row) => {
       const items = row.recentActivities.map((activity) => {
+        if (activity.kind === "order") {
+          return [
+            "  ",
+            formatTime(activity.timestamp),
+            pad(activity.action, 11, "left"),
+            pad(orderActivityExecutionLabel(activity), 11, "left"),
+            pad(activity.orderKind, 8, "left"),
+            pad(`${activity.market} ${activity.side}`, 10, "left"),
+            pad(formatPrice(activity.triggerPriceUsd), 10, "left"),
+            pad(activity.entirePosition ? "full" : formatUsd(activity.sizeUsd), 10, "left"),
+          ].join(" ");
+        }
+
         const pnl = activity.realizedPnlUsd === null ? "--" : formatSignedUsd(activity.realizedPnlUsd);
         return [
           "  ",
@@ -573,20 +723,12 @@ function formatRecentActivityDetails(rows: SdkReconstructedRow[]): string {
   return sections.length > 0 ? `\nRecent Activity\n${sections.join("\n")}` : "";
 }
 
-function formatOrderSummary(row: SdkReconstructedRow): string {
-  const tpsl =
-    row.activeTpslRequests.length > 0
-      ? row.activeTpslRequests.map(formatTpslRequestSummary).join(" | ")
-      : "TP/SL --";
-  const limits = row.activeLimitOrderCount > 0 ? `LMT ${row.activeLimitOrderCount}` : "";
-  return [tpsl, limits].filter(Boolean).join(" ");
+function orderActivityExecutionLabel(activity: OrderRecentActivity): "limit" | "trigger" {
+  return activity.orderKind === "LIMIT" ? "limit" : "trigger";
 }
 
-function formatTpslRequestSummary(request: Position["tpslRequests"][number]): string {
-  const label = request.requestType.toUpperCase();
-  const trigger = request.triggerPriceUsd ? formatPrice(rawUsdToNumber(request.triggerPriceUsd)) : "market";
-  const size = request.entirePosition ? "full" : formatUsd(rawUsdToNumber(request.sizeUsd));
-  return `${label} ${trigger} ${size}`;
+function formatOrderSummary(row: SdkReconstructedRow): string {
+  return formatSdkActiveOrderSummary(row.activeOrderSnapshot);
 }
 
 function formatFeeBreakdown(row: {

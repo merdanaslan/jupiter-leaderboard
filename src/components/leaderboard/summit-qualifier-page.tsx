@@ -1,10 +1,24 @@
+"use client";
+
 import Image from "next/image";
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
+import {
+  formatSummitTimerFromPayload,
+  toSummitQualifierRows,
+} from "@/lib/summit-live-leaderboard";
+import type { SummitQualifierRow } from "@/lib/summit-live-leaderboard";
 import { cn } from "@/lib/utils";
+import {
+  useFlipListMovement,
+  useSummitMockDurationSeconds,
+  useSummitMockLeaderboardPayload,
+  useSummitMockLiveFlag,
+} from "./use-summit-mock-live";
+import { useSummitCelebrations } from "./use-summit-celebrations";
 
 const QUALIFIER_TIMER = "60:00";
 
-const QUALIFIER_TRADERS = [
+const STATIC_QUALIFIER_TRADERS = [
   { rank: 1, handle: "@merdan", name: "Merdan", initials: "MA", pnlUsd: "+$36.80", pnlPercent: "+36.8%", equity: "$136.80", volume: "$5.7K", positive: true },
   { rank: 2, handle: "@solape", name: "Sol Ape", initials: "SA", pnlUsd: "+$33.90", pnlPercent: "+33.9%", equity: "$133.90", volume: "$4.8K", positive: true },
   { rank: 3, handle: "@juptrader", name: "Jup Trader", initials: "JT", pnlUsd: "+$30.50", pnlPercent: "+30.5%", equity: "$130.50", volume: "$4.4K", positive: true },
@@ -32,6 +46,11 @@ const QUALIFIER_TRADERS = [
   { rank: 25, handle: "@lastliquid", name: "Last Liquid", initials: "LL", pnlUsd: "-$12.10", pnlPercent: "-12.1%", equity: "$87.90", volume: "$980", positive: false },
 ];
 
+const QUALIFIER_TRADERS: SummitQualifierRow[] = STATIC_QUALIFIER_TRADERS.map((trader) => ({
+  id: `qualifier-${trader.handle.replace(/^@/, "")}`,
+  ...trader,
+}));
+
 const SIDE_PATTERN_SEGMENTS = [
   { id: 1, className: "summit-side-pattern-segment-1" },
   { id: 2, className: "summit-side-pattern-segment-2 summit-side-pattern-continuation" },
@@ -39,7 +58,26 @@ const SIDE_PATTERN_SEGMENTS = [
   { id: 4, className: "summit-side-pattern-segment-4 summit-side-pattern-continuation" },
 ] as const;
 
-export function SummitQualifierPage() {
+export function SummitQualifierPage({
+  mockLive = false,
+  mockDurationSeconds,
+}: {
+  mockLive?: boolean;
+  mockDurationSeconds?: number;
+} = {}) {
+  const liveMode = useSummitMockLiveFlag(mockLive);
+  const liveMockDurationSeconds = useSummitMockDurationSeconds(mockDurationSeconds);
+  const livePayload = useSummitMockLeaderboardPayload(
+    "qualifier",
+    liveMode,
+    liveMockDurationSeconds ? { durationSeconds: liveMockDurationSeconds } : undefined,
+  );
+  const traders = liveMode ? toSummitQualifierRows(livePayload.traders) : QUALIFIER_TRADERS;
+  const timer = liveMode ? formatSummitTimerFromPayload(livePayload) : QUALIFIER_TIMER;
+  const orderedTraderIds = useMemo(() => traders.map((trader) => trader.id), [traders]);
+  const registerMovingRow = useFlipListMovement(orderedTraderIds, liveMode);
+  useSummitCelebrations({ enabled: liveMode, mode: "qualifier", payload: livePayload });
+
   return (
     <main className="summit-theme min-h-screen bg-black text-white">
       <section className="summit-qualifier-stage relative min-h-[100svh] overflow-x-hidden bg-black pb-10">
@@ -86,7 +124,7 @@ export function SummitQualifierPage() {
               Qualifier time left
             </span>
             <span className="font-black leading-none tabular-nums text-[30px] sm:text-[38px] lg:text-[52px]">
-              {QUALIFIER_TIMER}
+              {timer}
             </span>
           </div>
         </header>
@@ -100,9 +138,13 @@ export function SummitQualifierPage() {
             aria-label="Qualifier leaderboard"
             className="mx-auto flex max-w-[1320px] flex-col gap-2"
           >
-            {QUALIFIER_TRADERS.map((trader) => (
-              <Fragment key={trader.rank}>
-                <QualifierRow trader={trader} />
+            {traders.map((trader) => (
+              <Fragment key={trader.id}>
+                <QualifierRow
+                  trader={trader}
+                  rowRef={registerMovingRow(trader.id)}
+                  live={liveMode}
+                />
                 {trader.rank === 4 ? <QualificationDivider /> : null}
               </Fragment>
             ))}
@@ -113,13 +155,24 @@ export function SummitQualifierPage() {
   );
 }
 
-function QualifierRow({ trader }: { trader: (typeof QUALIFIER_TRADERS)[number] }) {
+function QualifierRow({
+  trader,
+  rowRef,
+  live,
+}: {
+  trader: SummitQualifierRow;
+  rowRef: (node: HTMLElement | null) => void;
+  live: boolean;
+}) {
   const qualifying = trader.rank <= 4;
 
   return (
     <article
       role="listitem"
+      ref={rowRef}
       data-qualifying={qualifying ? "true" : "false"}
+      data-summit-trader-id={trader.id}
+      data-live={live ? "true" : "false"}
       aria-label={`Rank #${trader.rank}, ${trader.handle}`}
       className={cn(
         "qualifier-board-row qualifier-row-glass qualifier-row-higher-transparency qualifier-row-extra-transparent grid min-h-[56px] grid-cols-[44px_minmax(0,1fr)_minmax(96px,auto)] items-center gap-2 border px-3 py-2 transition-colors sm:min-h-[56px] sm:grid-cols-[72px_minmax(210px,1.7fr)_minmax(140px,0.8fr)_minmax(110px,0.65fr)_minmax(130px,0.7fr)_minmax(120px,0.65fr)] sm:gap-4 sm:px-6",
