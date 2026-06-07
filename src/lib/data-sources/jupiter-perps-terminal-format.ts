@@ -334,7 +334,7 @@ function formatLifecycleSummary(lifecycle: TradeLifecycle): string {
     `gross ${formatTerminalSignedUsd(lifecycle.grossPnlUsd)}`,
     `net ${formatTerminalSignedUsd(lifecycle.netPnlUsd)}`,
     `volume ${formatTerminalUsd(lifecycle.volumeUsd)}`,
-    `fees ${formatTerminalUsd(lifecycle.feesUsd)}`,
+    `fees ${formatTerminalFeeUsd(lifecycle.feesUsd)}`,
   ];
 
   return labels.filter(Boolean).join(" | ");
@@ -349,7 +349,7 @@ function formatLifecycleExecution(execution: TradeLifecycleExecution): string {
     execution.priceUsd ? `price ${formatTerminalPrice(execution.priceUsd)}` : undefined,
     execution.collateralUsdDelta ? `collat ${formatTerminalSignedUsd(execution.collateralUsdDelta)}` : undefined,
     execution.pnlUsd ? `pnl ${formatTerminalSignedUsd(execution.pnlUsd)}` : undefined,
-    `fee ${formatTerminalUsd(execution.feeUsd)}`,
+    `fee ${formatTerminalFeeUsd(execution.feeUsd)}`,
     `sig ${shortSignature(execution.signature)}`,
   ];
 
@@ -376,6 +376,16 @@ function formatTerminalSignedUsd(value: number): string {
   const normalized = Math.abs(value) < 0.005 ? 0 : value;
   const prefix = normalized > 0 ? "+" : normalized < 0 ? "-" : "";
   return `${prefix}${formatTerminalUsd(Math.abs(normalized))}`;
+}
+
+function formatTerminalFeeUsd(value: number): string {
+  if (!Number.isFinite(value)) return "--";
+  const normalized = Math.abs(value) < 0.0005 ? 0 : value;
+  const fractionDigits = Math.abs(normalized) < 1 ? 3 : 2;
+  return `$${normalized.toLocaleString("en-US", {
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
+  })}`;
 }
 
 function formatTerminalPrice(value: number): string {

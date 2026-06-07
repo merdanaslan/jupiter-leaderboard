@@ -200,7 +200,7 @@ describe("JupiterPerpsSolstreamAdapter", () => {
     );
   });
 
-  it("subscribes to Doves oracle account updates through Solstream", () => {
+  it("subscribes to Doves AG oracle account updates through Solstream", () => {
     const subscribe = vi.fn(() => ({ id: "sub", cancel: vi.fn() }));
     const perpsClient = new JupiterPerpsOnChainClient(new Connection("http://localhost:8899"));
     const adapter = new JupiterPerpsSolstreamAdapter(perpsClient, fakeSolstreamClient(subscribe));

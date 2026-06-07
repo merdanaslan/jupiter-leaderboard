@@ -16,6 +16,9 @@
     "jupiter:tx": "tsx scripts/jupiter-perps-live.ts tx",
     "jupiter:grpc": "tsx scripts/jupiter-perps-live.ts grpc",
     "jupiter:grpc-watch": "tsx scripts/jupiter-perps-live.ts grpc-watch",
+    "jupiter:api-leaderboard": "tsx scripts/jupiter-perps-api-leaderboard.ts",
+    "jupiter:sdk-leaderboard": "tsx scripts/jupiter-perps-sdk-leaderboard.ts",
+    "jupiter:sdk-reconstruct": "tsx scripts/jupiter-perps-sdk-reconstruct.ts",
     "test:jupiter-mainnet": "RUN_MAINNET_TESTS=1 vitest run src/lib/data-sources/jupiter-perps-mainnet.test.ts",
     "test:watch": "vitest"
   },
@@ -27,6 +30,7 @@
     "bs58": "^6.0.0",
     "clsx": "^2.1.1",
     "google-proto-files": "^5.0.1",
+    "jupiter-perps-api-sdk": "^0.1.0",
     "lucide-react": "^0.468.0",
     "next": "^15.3.2",
     "papaparse": "^5.5.2",

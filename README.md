@@ -123,6 +123,137 @@ For CLI validation, use `--terminal-leaderboard` with `jupiter:grpc-watch` to re
 
 Lifecycle reconstruction is best-effort over the data the watcher has seen. In normal validation mode it can include recent backfilled trade events plus current account state. In fresh round live mode it starts from the moment the watcher starts, which is the intended event setup. For the public cup display, keep the top-level leaderboard focused on total round PnL/equity/volume; use lifecycle details selectively for internal validation or a compact final-mode recent-trades panel.
 
+## Jupiter Competition API Test
+
+Jupiter shared a staging HTTP leaderboard endpoint for partner competitions. Test it separately from the Solstream/on-chain parser with:
+
+```bash
+npm run jupiter:api-leaderboard -- \
+  --wallet 7orgFWEBNCsqspUTX8AZurjRfHrgRYZiswm4ewqJmH9E \
+  --starting-equity 100 \
+  --max-polls 1
+```
+
+For a full event wallet file or trader config:
+
+```bash
+npm run jupiter:api-leaderboard -- --wallet-file config/test-wallets.local.txt --starting-equity 100
+npm run jupiter:api-leaderboard -- --trader-config-file config/traders.local.csv --mode qualifier
+```
+
+The command defaults to the staging URL from Jupiter's gist, or override with `PERPS_COMPETITION_API_URL`, `PERPS_API_URL`, or `--base-url`. It polls `POST /competition-leaderboard`, converts raw `1e6`-scaled USD strings into display values, and computes display equity as `startingEquity + livePnl`.
+
+Each poll retries transient failures by default with `--retries 2 --retry-delay-ms 1000`. For example, a 12s timeout can take about 39s before that poll reports failure. Use `--retries 0` for fast fail, or increase `--request-timeout-ms` for a one-off staging test:
+
+```bash
+npm run jupiter:api-leaderboard -- \
+  --wallet 7orgFWEBNCsqspUTX8AZurjRfHrgRYZiswm4ewqJmH9E \
+  --starting-equity 100 \
+  --max-polls 1 \
+  --request-timeout-ms 60000 \
+  --retries 1
+```
+
+Use this path for side-by-side validation only until the endpoint is stable and production-hosted. The staging API may return transient `503 leaderboard_live_data_unavailable` or time out while its live cache is unavailable. If it becomes reliable, the HTTP API can be wrapped behind the same leaderboard data interface and is easier to deploy from Vercel than a long-running gRPC watcher.
+
+## Jupiter Perps SDK Leaderboard Test
+
+The SDK path is tested separately from the raw HTTP helper so the three data-source tracks stay clear:
+
+- `jupiter:api-leaderboard`: direct HTTP call to the competition endpoint.
+- `jupiter:sdk-leaderboard`: `jupiter-perps-api-sdk` client calling the same competition endpoint.
+- `jupiter:grpc-watch`: our Solstream/on-chain IDL-derived watcher.
+
+Run the SDK leaderboard with:
+
+```bash
+npm run jupiter:sdk-leaderboard -- \
+  --wallet 7orgFWEBNCsqspUTX8AZurjRfHrgRYZiswm4ewqJmH9E \
+  --starting-equity 100 \
+  --max-polls 1
+```
+
+For live polling:
+
+```bash
+START_TS=$(date +%s)
+
+npm run jupiter:sdk-leaderboard -- \
+  --wallet 7orgFWEBNCsqspUTX8AZurjRfHrgRYZiswm4ewqJmH9E \
+  --starting-equity 100 \
+  --start-timestamp "$START_TS" \
+  --interval-ms 3000 \
+  --request-timeout-ms 12000 \
+  --retries 2
+```
+
+The SDK is Vercel-friendly if Jupiter's hosted endpoint is reliable, because it uses short-lived HTTP requests. It does not bypass `/competition-leaderboard`; if that backend is down or timing out, the SDK path is expected to fail the same way as the raw HTTP path.
+
+## Jupiter SDK Reconstruction Test
+
+If the dedicated competition endpoint is unavailable, `jupiter:sdk-reconstruct` rebuilds a leaderboard from the SDK read endpoints instead of calling `/competition-leaderboard`:
+
+- `positions.get({ walletAddress })` for open positions, live unrealized PnL, equity contribution, fees, leverage, collateral, TP/SL requests.
+- `positions.getTrades({ walletAddress, createdAtAfter })` for round volume, realized PnL events, and final-mode recent activity.
+- `orders.getLimitOrders({ walletAddress })` only when `--include-limit-orders` is passed.
+
+Run a one-off SDK reconstruction poll:
+
+```bash
+START_TS=$(date +%s)
+
+npm run jupiter:sdk-reconstruct -- \
+  --wallet 7orgFWEBNCsqspUTX8AZurjRfHrgRYZiswm4ewqJmH9E \
+  --starting-equity 100 \
+  --start-timestamp "$START_TS" \
+  --max-polls 1
+```
+
+Run a 2-3 second polling test:
+
+```bash
+START_TS=$(date +%s)
+
+npm run jupiter:sdk-reconstruct -- \
+  --wallet-file config/test-wallets.local.txt \
+  --starting-equity 100 \
+  --start-timestamp "$START_TS" \
+  --interval-ms 2000 \
+  --trade-limit 100 \
+  --max-trade-pages 5 \
+  --concurrency 8
+```
+
+For a terminal leaderboard similar to the Solstream CLI, keep the default table output and add recent activity rows:
+
+```bash
+START_TS=$(date +%s)
+
+npm run jupiter:sdk-reconstruct -- \
+  --wallet-file config/test-wallets.local.txt \
+  --starting-equity 100 \
+  --start-timestamp "$START_TS" \
+  --interval-ms 2000 \
+  --recent-limit 3 \
+  --include-limit-orders
+```
+
+The SDK reconstruction table shows rank, trader, net PnL, cup %, open-position %, equity, round volume, collateral, leverage, current open position, fee breakdown, active TP/SL count, optional active limit-order count, and recent activity. The recent activity section is intended for internal testing and final-mode display experiments: action, market, side, realized PnL for close/decrease/liquidation actions, size, token amount, execution price, fee, execution type, and shortened transaction signature.
+
+Use a fixed `START_TS` for competition tests. If omitted, the script uses a rolling `now - --since-minutes` window, which is useful for inspection but not correct for an official round.
+
+This path is Vercel-friendly because it uses normal HTTP reads, but it makes per-wallet calls. For 25 qualifier wallets, expect one positions request plus one or more paged trades requests per wallet per poll. The script fetches trades in pages and marks a wallet partial if the round has more trades than `--trade-limit * --max-trade-pages`. It should be treated as Plan B until rate limits and 25-wallet latency are rehearsed with Jupiter.
+
+For the public qualifier/final leaderboards, the SDK reconstruction path covers the required fields: rank, trader display name from local config, PnL, PnL %, equity, notional volume, final gap-to-leader, current open position data, and recent activity. Timer, lock/freeze behavior, selected finalists, and Top 4 display rules remain app state/UI concerns.
+
+Known SDK reconstruction limits:
+
+- It does not call the dedicated competition endpoint, so it reconstructs round state from per-wallet position and trade reads.
+- Filled trigger trades are exposed as `Trigger`; without an explicit TP/SL field in the SDK trade payload, the UI should label them as trigger executions rather than claiming exact TP vs SL after fill.
+- Active TP/SL requests are available from open positions, and active limit orders are available only when `--include-limit-orders` is used.
+- Trade rows include timestamps and transaction hashes but not Solana slots.
+- `trade.pnl` fee semantics should still be confirmed with Jupiter before making the SDK reconstruction path official for prize settlement.
+
 The operator SSE watch endpoint can use the same gRPC-backed tracker with `transport=solstream`, for example `/api/operator/jupiter-perps/watch?transport=solstream&walletAddresses=<WALLET>&includeOraclePrices=true`. Solstream watch defaults to `signatureLimit=0` unless explicitly provided, so a provider without transaction-history RPC can still stream live round data from `fromSlot`.
 
 Do not commit real wallet addresses, secrets, RPC URLs, or event state.

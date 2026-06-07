@@ -7,11 +7,19 @@ import type { PricesByMarket } from "./jupiter-perps-pnl";
 
 export const DOVES_PROGRAM_ID = "DoVEsk76QybCEHQGzkvYPWLQu9gzNoZZZt3TPiL597e";
 
-export const DOVES_ORACLE_BY_MARKET: Record<TradeMarket, string> = {
+export const DOVES_PRICE_FEED_BY_MARKET: Record<TradeMarket, string> = {
   SOL: "39cWjvHrpHNz2SbXv6ME4NPhqBDBd4KsjUYv5JkHEAJU",
   ETH: "5URYohbPy32nxK1t3jAHVNfdWY2xTubHiFvLrE3VhXEp",
   BTC: "4HBbPx9QJdjJ7GUe6bsiJjGybvfpDhQMMPXP1UEa7VT5",
 };
+
+export const DOVES_AG_ORACLE_BY_MARKET: Record<TradeMarket, string> = {
+  SOL: "FYq2BWQ1V5P1WFBqr3qB2Kb5yHVvSv7upzKodgQE5zXh",
+  ETH: "AFZnHPzy4mvVCffrVwhewHbFc93uTHvDSFrVH7GtfXF1",
+  BTC: "hUqAT1KQ7eW1i6Csp9CXYtpPfSAvi835V7wKi5fRfmC",
+};
+
+export const DOVES_ORACLE_BY_MARKET = DOVES_AG_ORACLE_BY_MARKET;
 
 const CUSTODY_BY_TRADE_MARKET: Record<TradeMarket, string> = {
   SOL: CUSTODY_BY_MARKET.SOL,
@@ -26,6 +34,7 @@ export interface JupiterPerpsOraclePrice {
   priceUsd: number;
   exponent: number;
   timestamp: number;
+  source: "doves-ag";
 }
 
 export class JupiterPerpsOracleClient {
@@ -47,7 +56,7 @@ export class JupiterPerpsOracleClient {
       return normalizeDovesOraclePrice({
         market: uniqueMarkets[index],
         oracleAddress: oraclePublicKeys[index].toBase58(),
-        decoded: this.decodePriceFeedData(account.data),
+        decoded: this.decodeAgPriceFeedData(account.data),
       });
     });
   }
@@ -56,12 +65,12 @@ export class JupiterPerpsOracleClient {
     return normalizeDovesOraclePrice({
       market,
       oracleAddress: DOVES_ORACLE_BY_MARKET[market],
-      decoded: this.decodePriceFeedData(data),
+      decoded: this.decodeAgPriceFeedData(data),
     });
   }
 
-  private decodePriceFeedData(data: Buffer | Uint8Array): Record<string, unknown> {
-    return this.coder.accounts.decode("priceFeed", Buffer.from(data)) as Record<string, unknown>;
+  private decodeAgPriceFeedData(data: Buffer | Uint8Array): Record<string, unknown> {
+    return this.coder.accounts.decode("agPriceFeed", Buffer.from(data)) as Record<string, unknown>;
   }
 
   async fetchPricesByMarket(markets: TradeMarket[] = ["SOL", "ETH", "BTC"]): Promise<PricesByMarket> {
@@ -81,7 +90,7 @@ export class JupiterPerpsOracleClient {
             normalizeDovesOraclePrice({
               market,
               oracleAddress: DOVES_ORACLE_BY_MARKET[market],
-              decoded: this.decodePriceFeedData(accountInfo.data),
+              decoded: this.decodeAgPriceFeedData(accountInfo.data),
             }),
             { slot: context.slot },
           );
@@ -106,6 +115,7 @@ export function normalizeDovesOraclePrice(input: {
     priceUsd: bnToNumber(input.decoded.price, exponent),
     exponent,
     timestamp: bnToInteger(input.decoded.timestamp),
+    source: "doves-ag",
   };
 }
 

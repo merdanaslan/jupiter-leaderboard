@@ -366,6 +366,48 @@ describe("Jupiter Perps IDL normalizers", () => {
     expect(snapshot.totalPnlUsd).toBe(100);
   });
 
+  it("estimates close fees from live increase event fees when custody configs are unavailable", () => {
+    const snapshot = buildWalletSnapshot({
+      walletAddress: owner.toBase58(),
+      trades: [
+        {
+          name: "IncreasePositionEvent",
+          signature: "sig-1",
+          slot: 1,
+          blockTime: 1716400010,
+          owner: owner.toBase58(),
+          position: position.toBase58(),
+          market: "SOL",
+          side: "long",
+          notionalUsd: 20,
+          feeUsd: 0.01,
+          pnlUsd: 0,
+          priceUsd: 70,
+          timestamp: "2024-05-22T18:00:10.000Z",
+        },
+      ],
+      positions: [
+        {
+          pubkey: position.toBase58(),
+          owner: owner.toBase58(),
+          market: "SOL",
+          side: "long",
+          sizeUsd: 20,
+          collateralUsd: 10,
+          entryPriceUsd: 70,
+          realisedPnlUsd: 0,
+          openTime: 1716400010,
+          updateTime: 1716400020,
+        },
+      ],
+    });
+
+    expect(snapshot.fees?.eventOpenFeeUsd).toBe(0.01);
+    expect(snapshot.fees?.estimatedCloseFeeUsd).toBe(0.01);
+    expect(snapshot.fees?.totalFeesUsd).toBe(0.02);
+    expect(snapshot.netPnlUsd).toBe(-0.02);
+  });
+
   it("adds current open position size as fallback volume and estimates net PnL fees", () => {
     const custody = new PublicKey(CUSTODY_BY_MARKET.SOL).toBase58();
     const snapshot = buildWalletSnapshot({

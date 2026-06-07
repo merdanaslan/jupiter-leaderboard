@@ -1,5 +1,5 @@
-import { FinalDisplay } from "@/components/leaderboard/final-display";
+import { SummitFinalPage } from "@/components/leaderboard/summit-final-page";
 
 export default function FinalPage() {
-  return <FinalDisplay />;
+  return <SummitFinalPage />;
 }

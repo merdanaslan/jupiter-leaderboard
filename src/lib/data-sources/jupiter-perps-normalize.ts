@@ -127,6 +127,8 @@ export interface JupiterPerpsCustodyConfig {
 
 export interface JupiterPerpsFeeSummary {
   eventFeeUsd: number;
+  eventOpenFeeUsd?: number;
+  eventCloseFeeUsd?: number;
   estimatedOpenFeeUsd: number;
   estimatedCloseFeeUsd: number;
   estimatedBorrowFeeUsd: number;

@@ -55,6 +55,13 @@ export function calculateWalletFeeSummary(input: {
   currentTimeSeconds?: number;
 }): JupiterPerpsFeeSummary {
   const eventFeeUsd = input.trades.reduce((sum, trade) => sum + trade.feeUsd, 0);
+  const eventOpenFeeUsd = input.trades
+    .filter((trade) => trade.name.includes("Increase"))
+    .reduce((sum, trade) => sum + trade.feeUsd, 0);
+  const eventCloseFeeUsd = input.trades
+    .filter((trade) => trade.name.includes("Decrease") || trade.name.includes("Liquidate"))
+    .reduce((sum, trade) => sum + trade.feeUsd, 0);
+  const observedIncreaseFeeRate = observedFeeRate(input.trades.filter((trade) => trade.name.includes("Increase")));
   const positionsWithIncreaseTrade = new Set(
     input.trades
       .filter((trade) => trade.name.includes("Increase"))
@@ -67,7 +74,10 @@ export function calculateWalletFeeSummary(input: {
   for (const position of input.positions) {
     const custodyConfig = position.custody ? input.custodyConfigsByAddress?.get(position.custody) : undefined;
 
-    if (!custodyConfig) continue;
+    if (!custodyConfig) {
+      estimatedCloseFeeUsd += calculateBasePositionFeeUsd(position.sizeUsd, observedIncreaseFeeRate * BPS_POWER);
+      continue;
+    }
 
     if (!positionsWithIncreaseTrade.has(position.pubkey)) {
       estimatedOpenFeeUsd += calculateBasePositionFeeUsd(position.sizeUsd, custodyConfig.increasePositionBps);
@@ -79,6 +89,8 @@ export function calculateWalletFeeSummary(input: {
 
   return normalizeFeeSummary({
     eventFeeUsd,
+    eventOpenFeeUsd,
+    eventCloseFeeUsd,
     estimatedOpenFeeUsd,
     estimatedCloseFeeUsd,
     estimatedBorrowFeeUsd,
@@ -89,6 +101,14 @@ export function calculateWalletFeeSummary(input: {
 function calculateBasePositionFeeUsd(sizeUsd: number, feeBps: number): number {
   if (!Number.isFinite(sizeUsd) || !Number.isFinite(feeBps) || sizeUsd <= 0 || feeBps <= 0) return 0;
   return (sizeUsd * feeBps) / BPS_POWER;
+}
+
+function observedFeeRate(trades: JupiterPerpsTradeEvent[]): number {
+  const notionalUsd = trades.reduce((sum, trade) => sum + Math.abs(trade.notionalUsd), 0);
+  const feeUsd = trades.reduce((sum, trade) => sum + trade.feeUsd, 0);
+
+  if (notionalUsd <= 0 || feeUsd <= 0) return 0;
+  return feeUsd / notionalUsd;
 }
 
 function calculateBorrowFeeUsd(
@@ -144,6 +164,8 @@ function getHourlyBorrowRate(custody: JupiterPerpsCustodyConfig): number {
 function normalizeFeeSummary(fees: JupiterPerpsFeeSummary): JupiterPerpsFeeSummary {
   return {
     eventFeeUsd: roundUsd(fees.eventFeeUsd),
+    eventOpenFeeUsd: roundUsd(fees.eventOpenFeeUsd ?? 0),
+    eventCloseFeeUsd: roundUsd(fees.eventCloseFeeUsd ?? 0),
     estimatedOpenFeeUsd: roundUsd(fees.estimatedOpenFeeUsd),
     estimatedCloseFeeUsd: roundUsd(fees.estimatedCloseFeeUsd),
     estimatedBorrowFeeUsd: roundUsd(fees.estimatedBorrowFeeUsd),

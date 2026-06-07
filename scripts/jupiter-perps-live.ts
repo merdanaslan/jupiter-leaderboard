@@ -23,6 +23,7 @@ import {
   formatTradeLifecycleDetailsForTerminal,
   formatTriggerOrdersForTerminal,
 } from "../src/lib/data-sources/jupiter-perps-terminal-format";
+import type { JupiterPerpsOraclePrice } from "../src/lib/data-sources/jupiter-perps-oracle";
 import type {
   JupiterPerpsTradeEvent,
   JupiterPerpsWalletSnapshot,
@@ -493,7 +494,7 @@ async function watchSolstream(options: CliOptions) {
       const trade = data as { trade: JupiterPerpsTradeEvent };
       console.log(formatTradeEvent(trade.trade));
     } else if (event === "oracle") {
-      const oracle = data as { price: { market: string; priceUsd: number; timestamp: number }; slot: number };
+      const oracle = data as { price: { market: string; priceUsd: number; timestamp: number; source?: string }; slot: number };
       console.log(
         [
           new Date().toISOString(),
@@ -501,8 +502,11 @@ async function watchSolstream(options: CliOptions) {
           oracle.price.market,
           `price=$${formatNumber(oracle.price.priceUsd)}`,
           `timestamp=${oracle.price.timestamp}`,
+          oracle.price.source ? `source=${oracle.price.source}` : "",
           `slot=${oracle.slot}`,
-        ].join(" "),
+        ]
+          .filter(Boolean)
+          .join(" "),
       );
     } else {
       console.log(`${event}: ${JSON.stringify(data)}`);
@@ -860,6 +864,7 @@ function renderTerminalLeaderboard(input: {
     receivedAt: string;
     slot?: number;
     snapshots: JupiterPerpsWalletSnapshot[];
+    oraclePrice?: JupiterPerpsOraclePrice;
   };
   scores: TraderScore[] | null;
   startingEquity?: number;
@@ -887,9 +892,9 @@ function renderTerminalLeaderboard(input: {
           volume: score.volume,
           collateralUsd,
           leverage: score.openTrade?.sizeUsd && collateralUsd > 0 ? score.openTrade.sizeUsd / collateralUsd : 0,
-          openFeeUsd: fees?.estimatedOpenFeeUsd ?? 0,
+          openFeeUsd: (fees?.eventOpenFeeUsd ?? 0) + (fees?.estimatedOpenFeeUsd ?? 0),
           borrowFeeUsd: fees?.estimatedBorrowFeeUsd ?? 0,
-          closeFeeUsd: fees?.estimatedCloseFeeUsd ?? 0,
+          closeFeeUsd: (fees?.eventCloseFeeUsd ?? 0) + (fees?.estimatedCloseFeeUsd ?? 0),
           feesUsd,
           grossPnlUsd,
           open: score.openTrade ? formatOpenTrade(score.openTrade) : score.recentTrade ? "closed" : "--",
@@ -922,9 +927,9 @@ function renderTerminalLeaderboard(input: {
             volume: snapshot.notionalVolumeUsd,
             collateralUsd,
             leverage: openSizeUsd && collateralUsd > 0 ? openSizeUsd / collateralUsd : 0,
-            openFeeUsd: fees?.estimatedOpenFeeUsd ?? 0,
+            openFeeUsd: (fees?.eventOpenFeeUsd ?? 0) + (fees?.estimatedOpenFeeUsd ?? 0),
             borrowFeeUsd: fees?.estimatedBorrowFeeUsd ?? 0,
-            closeFeeUsd: fees?.estimatedCloseFeeUsd ?? 0,
+            closeFeeUsd: (fees?.eventCloseFeeUsd ?? 0) + (fees?.estimatedCloseFeeUsd ?? 0),
             feesUsd,
             grossPnlUsd,
             open: snapshot.openTrade ? formatOpenTrade(snapshot.openTrade) : snapshot.recentTrade ? "closed" : "--",
@@ -947,6 +952,9 @@ function renderTerminalLeaderboard(input: {
       `updated=${input.update.receivedAt}`,
       `reason=${input.update.reason}`,
       input.update.slot ? `slot=${input.update.slot}` : "",
+      input.update.oraclePrice
+        ? `oracle=${input.update.oraclePrice.market} ${formatPrice(input.update.oraclePrice.priceUsd)} ${input.update.oraclePrice.source}`
+        : "",
       `equity=${input.equityBasis}`,
     ]
       .filter(Boolean)
@@ -977,7 +985,7 @@ function renderTerminalLeaderboard(input: {
       pad("Gross", 10, "left"),
       pad("Value", 10, "left"),
       pad("FeeTot", 8, "left"),
-      pad("Fees", 24, "left"),
+      pad("Fees", 30, "left"),
       pad("TP/SL", 36, "left"),
     ].join(" "),
   );
@@ -1007,8 +1015,8 @@ function renderTerminalLeaderboard(input: {
         pad(row.entryPrice === undefined ? "--" : formatPrice(row.entryPrice), 10, "left"),
         pad(formatSignedUsd(row.grossPnlUsd), 10, "left"),
         pad(formatUsd(row.positionValueUsd), 10, "left"),
-        pad(formatUsd(row.feesUsd), 8, "left"),
-        pad(formatFeeBreakdown(row), 24, "left"),
+        pad(formatFeeUsd(row.feesUsd), 8, "left"),
+        pad(formatFeeBreakdown(row), 30, "left"),
         pad(row.triggerOrders, 36, "left"),
       ].join(" "),
     );
@@ -1034,12 +1042,12 @@ function formatOpenTrade(trade: NonNullable<TraderScore["openTrade"]>): string {
 
 function formatRecentTrade(trade: NonNullable<TraderScore["recentTrade"]>): string {
   const action = trade.action ?? "trade";
-  const pnl = trade.pnlUsd === undefined ? "" : ` ${formatSignedUsd(trade.pnlUsd)}`;
+  const pnl = trade.pnlUsd === undefined || Math.abs(trade.pnlUsd) < 0.005 ? "" : ` ${formatSignedUsd(trade.pnlUsd)}`;
   return `${action} ${trade.market} ${trade.side} ${formatUsd(trade.notionalUsd)}${pnl}`;
 }
 
 function terminalWidth(): number {
-  return Math.max(122, Math.min(process.stdout.columns ?? 140, 160));
+  return Math.max(148, Math.min(process.stdout.columns ?? 148, 160));
 }
 
 function separator(width: number): string {
@@ -1056,7 +1064,7 @@ function formatFeeBreakdown(row: {
   borrowFeeUsd: number;
   closeFeeUsd: number;
 }): string {
-  return `O ${formatUsd(row.openFeeUsd)} B ${formatUsd(row.borrowFeeUsd)} C ${formatUsd(row.closeFeeUsd)}`;
+  return `O ${formatFeeUsd(row.openFeeUsd)} B ${formatFeeUsd(row.borrowFeeUsd)} C ${formatFeeUsd(row.closeFeeUsd)}`;
 }
 
 function formatNumber(value: number): string {
@@ -1070,6 +1078,16 @@ function formatUsd(value: number): string {
   if (!Number.isFinite(value)) return "--";
   const normalized = Math.abs(value) < 0.005 ? 0 : value;
   return `$${formatNumber(normalized)}`;
+}
+
+function formatFeeUsd(value: number): string {
+  if (!Number.isFinite(value)) return "--";
+  const normalized = Math.abs(value) < 0.0005 ? 0 : value;
+  const fractionDigits = Math.abs(normalized) < 1 ? 3 : 2;
+  return `$${normalized.toLocaleString("en-US", {
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: fractionDigits,
+  })}`;
 }
 
 function formatSignedUsd(value: number): string {

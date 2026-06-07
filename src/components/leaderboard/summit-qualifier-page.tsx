@@ -5,31 +5,31 @@ import { cn } from "@/lib/utils";
 const QUALIFIER_TIMER = "60:00";
 
 const QUALIFIER_TRADERS = [
-  { rank: 1, handle: "@merdan", name: "Merdan", initials: "MA", pnlUsd: "+$18,420", pnlPercent: "+36.8%", equity: "$68,420", volume: "$2.84M", positive: true },
-  { rank: 2, handle: "@solape", name: "Sol Ape", initials: "SA", pnlUsd: "+$16,980", pnlPercent: "+33.9%", equity: "$66,980", volume: "$2.41M", positive: true },
-  { rank: 3, handle: "@juptrader", name: "Jup Trader", initials: "JT", pnlUsd: "+$15,260", pnlPercent: "+30.5%", equity: "$65,260", volume: "$2.19M", positive: true },
-  { rank: 4, handle: "@berlinbull", name: "Berlin Bull", initials: "BB", pnlUsd: "+$13,880", pnlPercent: "+27.8%", equity: "$63,880", volume: "$1.96M", positive: true },
-  { rank: 5, handle: "@blocksmith", name: "Blocksmith", initials: "BS", pnlUsd: "+$12,940", pnlPercent: "+25.9%", equity: "$62,940", volume: "$1.88M", positive: true },
-  { rank: 6, handle: "@perpchef", name: "Perp Chef", initials: "PC", pnlUsd: "+$11,610", pnlPercent: "+23.2%", equity: "$61,610", volume: "$1.76M", positive: true },
-  { rank: 7, handle: "@neonmaker", name: "Neon Maker", initials: "NM", pnlUsd: "+$10,420", pnlPercent: "+20.8%", equity: "$60,420", volume: "$1.63M", positive: true },
-  { rank: 8, handle: "@satoshisurf", name: "Satoshi Surf", initials: "SS", pnlUsd: "+$9,780", pnlPercent: "+19.6%", equity: "$59,780", volume: "$1.55M", positive: true },
-  { rank: 9, handle: "@liquidmax", name: "Liquid Max", initials: "LM", pnlUsd: "+$8,940", pnlPercent: "+17.9%", equity: "$58,940", volume: "$1.48M", positive: true },
-  { rank: 10, handle: "@byteflow", name: "Byte Flow", initials: "BF", pnlUsd: "+$7,830", pnlPercent: "+15.7%", equity: "$57,830", volume: "$1.39M", positive: true },
-  { rank: 11, handle: "@riskrunner", name: "Risk Runner", initials: "RR", pnlUsd: "+$6,920", pnlPercent: "+13.8%", equity: "$56,920", volume: "$1.34M", positive: true },
-  { rank: 12, handle: "@orbitpnl", name: "Orbit PnL", initials: "OP", pnlUsd: "+$6,120", pnlPercent: "+12.2%", equity: "$56,120", volume: "$1.27M", positive: true },
-  { rank: 13, handle: "@chainpilot", name: "Chain Pilot", initials: "CP", pnlUsd: "+$5,440", pnlPercent: "+10.9%", equity: "$55,440", volume: "$1.18M", positive: true },
-  { rank: 14, handle: "@alphaberlin", name: "Alpha Berlin", initials: "AB", pnlUsd: "+$4,860", pnlPercent: "+9.7%", equity: "$54,860", volume: "$1.10M", positive: true },
-  { rank: 15, handle: "@candlemind", name: "Candle Mind", initials: "CM", pnlUsd: "+$4,120", pnlPercent: "+8.2%", equity: "$54,120", volume: "$998K", positive: true },
-  { rank: 16, handle: "@swaplogic", name: "Swap Logic", initials: "SL", pnlUsd: "+$3,580", pnlPercent: "+7.2%", equity: "$53,580", volume: "$942K", positive: true },
-  { rank: 17, handle: "@turbosol", name: "Turbo SOL", initials: "TS", pnlUsd: "+$2,940", pnlPercent: "+5.9%", equity: "$52,940", volume: "$884K", positive: true },
-  { rank: 18, handle: "@greenwick", name: "Green Wick", initials: "GW", pnlUsd: "+$2,160", pnlPercent: "+4.3%", equity: "$52,160", volume: "$821K", positive: true },
-  { rank: 19, handle: "@deltahaus", name: "Delta Haus", initials: "DH", pnlUsd: "+$1,520", pnlPercent: "+3.0%", equity: "$51,520", volume: "$760K", positive: true },
-  { rank: 20, handle: "@makerbee", name: "Maker Bee", initials: "MB", pnlUsd: "+$940", pnlPercent: "+1.9%", equity: "$50,940", volume: "$705K", positive: true },
-  { rank: 21, handle: "@fundingflip", name: "Funding Flip", initials: "FF", pnlUsd: "+$420", pnlPercent: "+0.8%", equity: "$50,420", volume: "$662K", positive: true },
-  { rank: 22, handle: "@marginmate", name: "Margin Mate", initials: "MM", pnlUsd: "-$1,220", pnlPercent: "-2.4%", equity: "$48,780", volume: "$608K", positive: false },
-  { rank: 23, handle: "@stormtrade", name: "Storm Trade", initials: "ST", pnlUsd: "-$2,680", pnlPercent: "-5.4%", equity: "$47,320", volume: "$571K", positive: false },
-  { rank: 24, handle: "@wickedsol", name: "Wicked SOL", initials: "WS", pnlUsd: "-$4,130", pnlPercent: "-8.3%", equity: "$45,870", volume: "$522K", positive: false },
-  { rank: 25, handle: "@lastliquid", name: "Last Liquid", initials: "LL", pnlUsd: "-$6,040", pnlPercent: "-12.1%", equity: "$43,960", volume: "$490K", positive: false },
+  { rank: 1, handle: "@merdan", name: "Merdan", initials: "MA", pnlUsd: "+$36.80", pnlPercent: "+36.8%", equity: "$136.80", volume: "$5.7K", positive: true },
+  { rank: 2, handle: "@solape", name: "Sol Ape", initials: "SA", pnlUsd: "+$33.90", pnlPercent: "+33.9%", equity: "$133.90", volume: "$4.8K", positive: true },
+  { rank: 3, handle: "@juptrader", name: "Jup Trader", initials: "JT", pnlUsd: "+$30.50", pnlPercent: "+30.5%", equity: "$130.50", volume: "$4.4K", positive: true },
+  { rank: 4, handle: "@berlinbull", name: "Berlin Bull", initials: "BB", pnlUsd: "+$27.80", pnlPercent: "+27.8%", equity: "$127.80", volume: "$3.9K", positive: true },
+  { rank: 5, handle: "@blocksmith", name: "Blocksmith", initials: "BS", pnlUsd: "+$25.90", pnlPercent: "+25.9%", equity: "$125.90", volume: "$3.8K", positive: true },
+  { rank: 6, handle: "@perpchef", name: "Perp Chef", initials: "PC", pnlUsd: "+$23.20", pnlPercent: "+23.2%", equity: "$123.20", volume: "$3.5K", positive: true },
+  { rank: 7, handle: "@neonmaker", name: "Neon Maker", initials: "NM", pnlUsd: "+$20.80", pnlPercent: "+20.8%", equity: "$120.80", volume: "$3.3K", positive: true },
+  { rank: 8, handle: "@satoshisurf", name: "Satoshi Surf", initials: "SS", pnlUsd: "+$19.60", pnlPercent: "+19.6%", equity: "$119.60", volume: "$3.1K", positive: true },
+  { rank: 9, handle: "@liquidmax", name: "Liquid Max", initials: "LM", pnlUsd: "+$17.90", pnlPercent: "+17.9%", equity: "$117.90", volume: "$3.0K", positive: true },
+  { rank: 10, handle: "@byteflow", name: "Byte Flow", initials: "BF", pnlUsd: "+$15.70", pnlPercent: "+15.7%", equity: "$115.70", volume: "$2.8K", positive: true },
+  { rank: 11, handle: "@riskrunner", name: "Risk Runner", initials: "RR", pnlUsd: "+$13.80", pnlPercent: "+13.8%", equity: "$113.80", volume: "$2.7K", positive: true },
+  { rank: 12, handle: "@orbitpnl", name: "Orbit PnL", initials: "OP", pnlUsd: "+$12.20", pnlPercent: "+12.2%", equity: "$112.20", volume: "$2.5K", positive: true },
+  { rank: 13, handle: "@chainpilot", name: "Chain Pilot", initials: "CP", pnlUsd: "+$10.90", pnlPercent: "+10.9%", equity: "$110.90", volume: "$2.4K", positive: true },
+  { rank: 14, handle: "@alphaberlin", name: "Alpha Berlin", initials: "AB", pnlUsd: "+$9.70", pnlPercent: "+9.7%", equity: "$109.70", volume: "$2.2K", positive: true },
+  { rank: 15, handle: "@candlemind", name: "Candle Mind", initials: "CM", pnlUsd: "+$8.20", pnlPercent: "+8.2%", equity: "$108.20", volume: "$2.0K", positive: true },
+  { rank: 16, handle: "@swaplogic", name: "Swap Logic", initials: "SL", pnlUsd: "+$7.20", pnlPercent: "+7.2%", equity: "$107.20", volume: "$1.9K", positive: true },
+  { rank: 17, handle: "@turbosol", name: "Turbo SOL", initials: "TS", pnlUsd: "+$5.90", pnlPercent: "+5.9%", equity: "$105.90", volume: "$1.8K", positive: true },
+  { rank: 18, handle: "@greenwick", name: "Green Wick", initials: "GW", pnlUsd: "+$4.30", pnlPercent: "+4.3%", equity: "$104.30", volume: "$1.6K", positive: true },
+  { rank: 19, handle: "@deltahaus", name: "Delta Haus", initials: "DH", pnlUsd: "+$3.00", pnlPercent: "+3.0%", equity: "$103.00", volume: "$1.5K", positive: true },
+  { rank: 20, handle: "@makerbee", name: "Maker Bee", initials: "MB", pnlUsd: "+$1.90", pnlPercent: "+1.9%", equity: "$101.90", volume: "$1.4K", positive: true },
+  { rank: 21, handle: "@fundingflip", name: "Funding Flip", initials: "FF", pnlUsd: "+$0.80", pnlPercent: "+0.8%", equity: "$100.80", volume: "$1.3K", positive: true },
+  { rank: 22, handle: "@marginmate", name: "Margin Mate", initials: "MM", pnlUsd: "-$2.40", pnlPercent: "-2.4%", equity: "$97.60", volume: "$1.2K", positive: false },
+  { rank: 23, handle: "@stormtrade", name: "Storm Trade", initials: "ST", pnlUsd: "-$5.40", pnlPercent: "-5.4%", equity: "$94.60", volume: "$1.1K", positive: false },
+  { rank: 24, handle: "@wickedsol", name: "Wicked SOL", initials: "WS", pnlUsd: "-$8.30", pnlPercent: "-8.3%", equity: "$91.70", volume: "$1.0K", positive: false },
+  { rank: 25, handle: "@lastliquid", name: "Last Liquid", initials: "LL", pnlUsd: "-$12.10", pnlPercent: "-12.1%", equity: "$87.90", volume: "$980", positive: false },
 ];
 
 const SIDE_PATTERN_SEGMENTS = [
@@ -57,7 +57,7 @@ export function SummitQualifierPage() {
             />
           </div>
 
-          <div className="order-3 col-span-2 flex min-w-0 flex-col items-center justify-center gap-2 text-center md:order-none md:col-span-1 lg:flex-row lg:gap-4">
+          <div className="qualifier-event-lockup order-3 col-span-2 mx-auto flex w-full max-w-[340px] min-w-0 flex-col items-center justify-center gap-2 rounded-full border border-white/[0.08] bg-black/35 px-4 py-3 text-center shadow-[0_0_28px_rgba(20,241,149,0.06)] backdrop-blur-md md:order-none md:col-span-1 md:w-auto md:max-w-none md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-0 lg:flex-row lg:gap-4">
             <h1 className="text-[14px] font-bold uppercase leading-none tracking-[0.18em] text-white/86 sm:text-[15px] lg:text-[16px]">
               Trading Cup
             </h1>
@@ -80,24 +80,31 @@ export function SummitQualifierPage() {
           <div
             role="timer"
             aria-label="Qualifier timer"
-            className="summit-outline-cta flex h-[82px] w-[142px] items-center justify-center rounded-full px-4 text-[32px] font-black leading-none text-white tabular-nums sm:h-[91px] sm:w-[176px] sm:text-[40px] lg:h-[104px] lg:w-[260px] lg:text-[56px]"
+            className="summit-outline-cta flex h-[82px] w-[142px] flex-col items-center justify-center gap-1 rounded-full px-4 text-white sm:h-[91px] sm:w-[176px] lg:h-[104px] lg:w-[260px]"
           >
-            {QUALIFIER_TIMER}
+            <span className="whitespace-nowrap text-[7px] font-black uppercase leading-none tracking-[0.1em] text-[#14f195] sm:text-[9px] sm:tracking-[0.12em] lg:text-[11px]">
+              Qualifier time left
+            </span>
+            <span className="font-black leading-none tabular-nums text-[30px] sm:text-[38px] lg:text-[52px]">
+              {QUALIFIER_TIMER}
+            </span>
           </div>
         </header>
 
         <section className="summit-container relative z-10 pt-3">
+          <BoardTitle />
+          <MobileBoardHeader />
           <BoardHeader />
           <div
             role="list"
             aria-label="Qualifier leaderboard"
-            className="mx-auto flex max-w-[1320px] flex-col gap-1.5"
+            className="mx-auto flex max-w-[1320px] flex-col gap-2"
           >
             {QUALIFIER_TRADERS.map((trader) => (
-              <div key={trader.rank}>
+              <Fragment key={trader.rank}>
                 <QualifierRow trader={trader} />
                 {trader.rank === 4 ? <QualificationDivider /> : null}
-              </div>
+              </Fragment>
             ))}
           </div>
         </section>
@@ -115,15 +122,15 @@ function QualifierRow({ trader }: { trader: (typeof QUALIFIER_TRADERS)[number] }
       data-qualifying={qualifying ? "true" : "false"}
       aria-label={`Rank #${trader.rank}, ${trader.handle}`}
       className={cn(
-        "qualifier-board-row grid min-h-[50px] grid-cols-[44px_minmax(0,1fr)_minmax(96px,auto)] items-center gap-2 border px-3 py-1.5 backdrop-blur-md transition-colors sm:min-h-[48px] sm:grid-cols-[72px_minmax(210px,1.7fr)_minmax(140px,0.8fr)_minmax(110px,0.65fr)_minmax(130px,0.7fr)_minmax(120px,0.65fr)] sm:gap-4 sm:px-6",
+        "qualifier-board-row qualifier-row-glass qualifier-row-higher-transparency qualifier-row-extra-transparent grid min-h-[56px] grid-cols-[44px_minmax(0,1fr)_minmax(96px,auto)] items-center gap-2 border px-3 py-2 transition-colors sm:min-h-[56px] sm:grid-cols-[72px_minmax(210px,1.7fr)_minmax(140px,0.8fr)_minmax(110px,0.65fr)_minmax(130px,0.7fr)_minmax(120px,0.65fr)] sm:gap-4 sm:px-6",
         qualifying
-          ? "border-[#14f195]/45 bg-[#08291d]/70 shadow-[0_0_18px_rgba(20,241,149,0.045)]"
-          : "border-white/10 bg-[#111319]/88",
+          ? "qualifier-row-qualifying qualifier-row-qualifying-colored-fill qualifier-row-qualifying-subtle qualifier-row-qualifying-soft-fill qualifier-row-qualifying-gold-border"
+          : "qualifier-row-more-transparent qualifier-row-standard-glass",
       )}
     >
       <div
         className={cn(
-          "font-mono text-[17px] font-black leading-none tabular-nums sm:text-[18px]",
+          "font-mono text-[19px] font-black leading-none tabular-nums sm:text-[20px]",
           qualifying
             ? "text-[#b9ffe7]"
             : "text-white/72",
@@ -135,7 +142,7 @@ function QualifierRow({ trader }: { trader: (typeof QUALIFIER_TRADERS)[number] }
       <div className="flex min-w-0 items-center gap-2.5">
         <div
           className={cn(
-            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-black leading-none",
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black leading-none",
             qualifying
               ? "bg-gradient-to-br from-[#b9ffe7] to-[#14f195] text-[#06130d]"
               : "bg-gradient-to-br from-[#14f195] to-[#5ad7ff] text-[#06130d]",
@@ -145,10 +152,10 @@ function QualifierRow({ trader }: { trader: (typeof QUALIFIER_TRADERS)[number] }
           {trader.initials}
         </div>
         <div className="min-w-0">
-          <h2 className="truncate text-[14px] font-black leading-tight text-white sm:text-[15px]">
+          <h2 className="truncate text-[15px] font-black leading-tight text-white sm:text-[16px]">
             {trader.handle}
           </h2>
-          <p className="mt-0.5 truncate text-[12px] font-medium leading-none text-white/[0.42]">
+          <p className="mt-0.5 truncate text-[12px] font-medium leading-none text-white/[0.46] sm:text-[13px]">
             {trader.name}
           </p>
         </div>
@@ -159,6 +166,28 @@ function QualifierRow({ trader }: { trader: (typeof QUALIFIER_TRADERS)[number] }
       <CompactMetric className="hidden sm:block" value={trader.equity} />
       <CompactMetric className="hidden sm:block" value={trader.volume} muted />
     </article>
+  );
+}
+
+function BoardTitle() {
+  return (
+    <div className="qualifier-board-title mx-auto mb-5 mt-4 flex max-w-[1320px] items-center justify-center px-1 sm:px-6">
+      <div className="qualifier-board-title-label qualifier-board-title-glass flex shrink-0 items-center px-4 py-2.5">
+        <h2 className="shrink-0 text-[16px] font-black uppercase leading-none tracking-[0.1em] text-white sm:text-[24px] sm:tracking-[0.12em]">
+          Qualifier Leaderboard
+        </h2>
+      </div>
+    </div>
+  );
+}
+
+function MobileBoardHeader() {
+  return (
+    <div className="qualifier-mobile-board-header mx-auto mb-1 grid max-w-[1320px] grid-cols-[44px_minmax(0,1fr)_minmax(96px,auto)] gap-2 px-3 text-[11px] font-black uppercase tracking-[0.14em] text-[#c2bfca]/82 sm:hidden">
+      <span>Rank</span>
+      <span>Trader</span>
+      <span className="text-right">PnL</span>
+    </div>
   );
 }
 
@@ -191,8 +220,8 @@ function CompactMetric({
   return (
     <p
       className={cn(
-        "text-right font-mono text-[15px] font-black leading-none tabular-nums sm:text-left sm:text-[16px]",
-        dominant && "text-[16px] sm:text-[17px]",
+        "text-right font-mono text-[16px] font-black leading-none tabular-nums sm:text-left sm:text-[17px]",
+        dominant && "text-[17px] sm:text-[18px]",
         dominant && positive && "text-[#14f195]",
         dominant && !positive && "text-[#ff6b8a]",
         !dominant && !muted && "text-white/82",
@@ -207,9 +236,12 @@ function CompactMetric({
 
 function QualificationDivider() {
   return (
-    <div className="my-3 flex items-center gap-3 text-[#14f195]">
+    <div
+      data-qualification-divider="true"
+      className="qualification-divider my-5 flex items-center gap-3 text-[#14f195] sm:my-6"
+    >
       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#14f195]/45 to-[#14f195]/20" />
-      <div className="rounded-full border border-[#14f195]/45 bg-black/80 px-4 py-2 text-[12px] font-black uppercase tracking-[0.16em] shadow-[0_0_26px_rgba(20,241,149,0.12)]">
+      <div className="rounded-full border border-[#14f195]/45 bg-black/80 px-4 py-2 text-center text-[12px] font-black uppercase tracking-[0.16em] shadow-[0_0_26px_rgba(20,241,149,0.12)]">
         Top 4 qualify for the final
       </div>
       <div className="h-px flex-1 bg-gradient-to-l from-transparent via-[#14f195]/45 to-[#14f195]/20" />
@@ -224,13 +256,13 @@ function SummitSidePatterns() {
         <Fragment key={segment.id}>
           <span
             className={cn(
-              "summit-side-pattern summit-side-pattern-segment summit-side-pattern-left",
+              "summit-side-pattern summit-side-pattern-muted summit-side-pattern-segment summit-side-pattern-left",
               segment.className,
             )}
           />
           <span
             className={cn(
-              "summit-side-pattern summit-side-pattern-segment summit-side-pattern-right",
+              "summit-side-pattern summit-side-pattern-muted summit-side-pattern-segment summit-side-pattern-right",
               segment.className,
             )}
           />
