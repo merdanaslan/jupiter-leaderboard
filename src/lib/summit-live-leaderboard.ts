@@ -37,6 +37,7 @@ export type SummitQualifierRow = {
   handle: string;
   name: string;
   initials: string;
+  avatarUrl?: string;
   pnlUsd: string;
   pnlPercent: string;
   equity: string;
@@ -298,6 +299,7 @@ function toSummitQualifierRow(trader: PublicTraderScore): SummitQualifierRow {
     handle: trader.xHandle,
     name: trader.displayName,
     initials: initialsForTrader(trader),
+    avatarUrl: trader.avatarUrl,
     pnlUsd: formatSignedUsd(trader.pnlUsd),
     pnlPercent: formatSignedPercent(trader.pnlPercent),
     equity: formatUsd(trader.equity),

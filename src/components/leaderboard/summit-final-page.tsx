@@ -274,10 +274,20 @@ function FinalRow({
 
       <div className="finalist-trader-lockup flex min-w-0 items-center gap-2.5 sm:gap-3">
         <div
-          className="finalist-avatar flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-black leading-none sm:h-10 sm:w-10 sm:text-[12px]"
+          className="finalist-avatar relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-[11px] font-black leading-none sm:h-10 sm:w-10 sm:text-[12px]"
           aria-hidden="true"
         >
-          {finalist.initials}
+          {finalist.avatarUrl ? (
+            <Image
+              src={finalist.avatarUrl}
+              alt=""
+              fill
+              sizes="40px"
+              className="object-cover"
+            />
+          ) : (
+            finalist.initials
+          )}
         </div>
         <div className="min-w-0">
           <h3 className="truncate text-[18px] font-black leading-tight text-white sm:text-[19px]">

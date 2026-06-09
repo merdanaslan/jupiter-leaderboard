@@ -1,0 +1,33 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - img "Solana Summit Germany" [ref=e6]
+        - generic [ref=e7]:
+          - heading "Trading Cup" [level=1] [ref=e8]
+          - generic [ref=e10]:
+            - generic [ref=e11]: Powered by
+            - img "Jupiter" [ref=e12]
+        - timer "Qualifier timer" [ref=e13]:
+          - generic [ref=e14]: Qualifier time left
+          - generic [ref=e15]: 60:00
+      - generic [ref=e16]:
+        - heading "Qualifier Leaderboard" [level=2] [ref=e19]
+        - generic [ref=e20]:
+          - generic [ref=e21]: Rank
+          - generic [ref=e22]: Trader / X handle
+          - generic [ref=e23]: Net PnL USD
+          - generic [ref=e24]: PnL %
+          - generic [ref=e25]: Equity
+          - generic [ref=e26]: Volume
+        - list "Qualifier leaderboard" [ref=e27]:
+          - 'listitem "Rank #1, @jupiterwallet" [ref=e28]':
+            - generic [ref=e29]: "#1"
+            - generic [ref=e32]:
+              - heading "@jupiterwallet" [level=2] [ref=e33]
+              - paragraph [ref=e34]: Jupiter Wallet
+            - paragraph [ref=e35]: +$0.00
+            - paragraph [ref=e36]: +0.0%
+            - paragraph [ref=e37]: $100.00
+            - paragraph [ref=e38]: $0
+  - alert [ref=e39]

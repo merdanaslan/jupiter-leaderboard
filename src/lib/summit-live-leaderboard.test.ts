@@ -122,6 +122,29 @@ describe("summit live leaderboard mock feed", () => {
     expect(payload.state.status).toBe("locked");
   });
 
+  it("preserves avatar URLs for summit qualifier and final rows", () => {
+    const trader: PublicTraderScore = {
+      avatarUrl: "/avatars/mert.jpg",
+      displayName: "Jupiter Wallet",
+      equity: 100,
+      gapToLeader: 0,
+      id: "jupiter-wallet",
+      lastUpdated: "2026-06-07T09:00:00.000Z",
+      mode: "qualifier",
+      pnlPercent: 0,
+      pnlUsd: 0,
+      rank: 1,
+      startingBalance: 100,
+      startingEquity: 100,
+      status: "active",
+      volume: 0,
+      xHandle: "@jupiterwallet",
+    };
+
+    expect(toSummitQualifierRows([trader])[0].avatarUrl).toBe("/avatars/mert.jpg");
+    expect(toSummitFinalRows([{ ...trader, mode: "final", startingBalance: 1000, startingEquity: 1000 }])[0].avatarUrl).toBe("/avatars/mert.jpg");
+  });
+
   it("maps SDK recent activity into the final recent activity display shape", () => {
     const trader: PublicTraderScore = {
       displayName: "SDK Trader",

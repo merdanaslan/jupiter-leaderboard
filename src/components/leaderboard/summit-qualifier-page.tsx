@@ -200,14 +200,24 @@ function QualifierRow({
       <div className="flex min-w-0 items-center gap-2.5">
         <div
           className={cn(
-            "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black leading-none",
+            "relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-black leading-none",
             qualifying
               ? "bg-gradient-to-br from-[#b9ffe7] to-[#14f195] text-[#06130d]"
               : "bg-gradient-to-br from-[#14f195] to-[#5ad7ff] text-[#06130d]",
           )}
           aria-hidden="true"
         >
-          {trader.initials}
+          {trader.avatarUrl ? (
+            <Image
+              src={trader.avatarUrl}
+              alt=""
+              fill
+              sizes="28px"
+              className="object-cover"
+            />
+          ) : (
+            trader.initials
+          )}
         </div>
         <div className="min-w-0">
           <h2 className="truncate text-[15px] font-black leading-tight text-white sm:text-[16px]">
