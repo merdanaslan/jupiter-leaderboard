@@ -7,3 +7,4 @@ config/*.local.*
 .env*.local
 *.log
 .DS_Store
+.vercel
