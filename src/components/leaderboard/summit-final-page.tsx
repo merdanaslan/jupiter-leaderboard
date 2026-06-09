@@ -118,7 +118,11 @@ export function SummitFinalPage({
   const displayPayload = liveMode ? livePayload : apiLeaderboard.data;
   const celebrationPayload = displayPayload ?? livePayload;
   const isDynamic = liveMode || Boolean(apiLeaderboard.data);
-  const finalists = displayPayload ? toSummitFinalRows(displayPayload.traders) : FINALISTS;
+  const finalists = displayPayload
+    ? toSummitFinalRows(displayPayload.traders)
+    : liveMode
+      ? FINALISTS
+      : [];
   const timer = useSmoothLeaderboardTimer(displayPayload, FINAL_TIMER);
   const orderedFinalistIds = useMemo(() => finalists.map((finalist) => finalist.id), [finalists]);
   const registerMovingRow = useFlipListMovement(orderedFinalistIds, isDynamic);

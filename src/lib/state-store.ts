@@ -54,6 +54,7 @@ export class LocalJsonRoundStateStore implements RoundStateStore {
 
 export class SupabaseRoundStateStore implements RoundStateStore {
   private updateQueue: Promise<void> = Promise.resolve();
+  private readonly maxUpdateAttempts = 5;
 
   constructor(
     private readonly config: {
@@ -65,19 +66,7 @@ export class SupabaseRoundStateStore implements RoundStateStore {
   ) {}
 
   async get(): Promise<RoundState> {
-    const response = await fetch(
-      `${this.restUrl()}?id=eq.${encodeURIComponent(this.rowId())}&select=state&limit=1`,
-      {
-        headers: this.headers(),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Supabase state read failed: ${response.status} ${await response.text()}`);
-    }
-
-    const rows = (await response.json()) as Array<{ state: unknown }>;
-    return rows[0]?.state ? normalizeRoundState(rows[0].state) : createInitialRoundState();
+    return (await this.getRow()).state;
   }
 
   async set(state: RoundState): Promise<void> {
@@ -103,16 +92,103 @@ export class SupabaseRoundStateStore implements RoundStateStore {
     let result: RoundState | undefined;
 
     const run = this.updateQueue.then(async () => {
-      const current = await this.get();
-      const next = normalizeRoundState(await updater(current));
-      await this.set(next);
-      result = next;
+      for (let attempt = 0; attempt < this.maxUpdateAttempts; attempt += 1) {
+        const current = await this.getRow();
+        const next = normalizeRoundState(await updater(current.state));
+        const saved = current.exists
+          ? await this.patchIfVersionMatches(next, current.version)
+          : await this.insertIfMissing(next);
+
+        if (saved) {
+          result = next;
+          return;
+        }
+      }
+
+      throw new Error("Supabase state update failed: concurrent modifications did not settle");
     });
 
     this.updateQueue = run.catch(() => undefined);
     await run;
 
     return result as RoundState;
+  }
+
+  private async getRow(): Promise<{ exists: boolean; state: RoundState; version: number }> {
+    const response = await fetch(
+      `${this.restUrl()}?id=eq.${encodeURIComponent(this.rowId())}&select=state,version&limit=1`,
+      {
+        headers: this.headers(),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Supabase state read failed: ${response.status} ${await response.text()}`);
+    }
+
+    const rows = (await response.json()) as Array<{ state: unknown; version?: unknown }>;
+    const row = rows[0];
+    if (!row) {
+      return { exists: false, state: createInitialRoundState(), version: 0 };
+    }
+
+    return {
+      exists: true,
+      state: normalizeRoundState(row.state),
+      version: typeof row.version === "number" ? row.version : 0,
+    };
+  }
+
+  private async insertIfMissing(state: RoundState): Promise<boolean> {
+    const response = await fetch(`${this.restUrl()}?select=version`, {
+      body: JSON.stringify({
+        id: this.rowId(),
+        state: normalizeRoundState(state),
+        version: 1,
+        updated_at: new Date().toISOString(),
+      }),
+      headers: {
+        ...this.headers(),
+        Prefer: "return=representation",
+      },
+      method: "POST",
+    });
+
+    if (response.status === 409) {
+      return false;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Supabase state write failed: ${response.status} ${await response.text()}`);
+    }
+
+    const rows = (await response.json()) as Array<{ version?: unknown }>;
+    return rows.length === 1;
+  }
+
+  private async patchIfVersionMatches(state: RoundState, expectedVersion: number): Promise<boolean> {
+    const response = await fetch(
+      `${this.restUrl()}?id=eq.${encodeURIComponent(this.rowId())}&version=eq.${expectedVersion}&select=version`,
+      {
+        body: JSON.stringify({
+          state: normalizeRoundState(state),
+          version: expectedVersion + 1,
+          updated_at: new Date().toISOString(),
+        }),
+        headers: {
+          ...this.headers(),
+          Prefer: "return=representation",
+        },
+        method: "PATCH",
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`Supabase state write failed: ${response.status} ${await response.text()}`);
+    }
+
+    const rows = (await response.json()) as Array<{ version?: unknown }>;
+    return rows.length === 1;
   }
 
   private headers(): Record<string, string> {

@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { noStoreJson } from "@/app/api/no-store";
 import { getOperatorState } from "@/lib/runtime";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  return NextResponse.json(await getOperatorState());
+  return noStoreJson(await getOperatorState());
 }

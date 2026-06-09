@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { noStoreJson } from "@/app/api/no-store";
 import { getPublicLeaderboard } from "@/lib/runtime";
 import type { CompetitionMode } from "@/lib/types";
 
@@ -9,5 +9,5 @@ export async function GET(request: Request) {
   const modeParam = searchParams.get("mode");
   const mode: CompetitionMode = modeParam === "final" ? "final" : "qualifier";
 
-  return NextResponse.json(await getPublicLeaderboard(mode));
+  return noStoreJson(await getPublicLeaderboard(mode));
 }

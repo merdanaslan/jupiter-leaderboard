@@ -17,8 +17,11 @@ describe("FinalPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders a static Solana Summit final leaderboard while polling leaderboard data", () => {
-    const { container } = render(<FinalPage />);
+  it("renders a static Solana Summit final leaderboard in mock live mode", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-13T12:00:00.000Z"));
+
+    const { container } = render(<SummitFinalPage mockLive />);
 
     expect(
       screen.getByRole("img", { name: "Solana Summit Germany" }),
@@ -125,13 +128,13 @@ describe("FinalPage", () => {
       expect(row.querySelector(".finalist-trader-lockup")).toBeInTheDocument();
       expect(row.querySelector(".final-row-main-pnl")).toBeInTheDocument();
       expect(row.querySelector(".final-row-recent-activity")).toBeInTheDocument();
-      expect(row.querySelector(".final-row-recent-detail")).not.toBeInTheDocument();
-      expect(row).toHaveTextContent("--");
+      expect(row.querySelector(".final-row-recent-detail")).toBeInTheDocument();
       expect(within(row).queryByText("Recent")).not.toBeInTheDocument();
       expect(row.querySelector(".final-race-track")).not.toBeInTheDocument();
       expect(row.querySelector(".final-race-progress")).not.toBeInTheDocument();
     });
     expect(container.querySelectorAll(".final-row-recent-activity")).toHaveLength(4);
+    expect(container.querySelectorAll(".final-row-recent-detail")).toHaveLength(4);
     expect(container.querySelectorAll(".finalist-sparkline")).toHaveLength(0);
     expect(container.querySelectorAll(".final-challenger-sparkline")).toHaveLength(0);
     expect(container.querySelectorAll(".finalist-card-metric")).toHaveLength(0);
@@ -141,8 +144,8 @@ describe("FinalPage", () => {
     expect(finalistRows[0]).toHaveTextContent("+43.5%");
     expect(finalistRows[0]).toHaveTextContent("$1,435.00");
     expect(finalistRows[0]).toHaveTextContent("$63.6K");
-    expect(finalistRows[0]).not.toHaveTextContent("CLOSE");
-    expect(finalistRows[0]).not.toHaveTextContent("18.2 @ $162.40");
+    expect(finalistRows[0]).toHaveTextContent("CLOSE");
+    expect(finalistRows[0]).toHaveTextContent("$3.0K @ $162.40");
     expect(finalistRows[1]).toHaveTextContent("+$428.00");
     expect(finalistRows[1]).toHaveTextContent("$1,428.00");
     expect(finalistRows[1]).toHaveTextContent("$59.2K");
@@ -157,6 +160,15 @@ describe("FinalPage", () => {
     expect(container.querySelectorAll(".final-race-gap")).toHaveLength(0);
     expect(container.querySelector(".summit-final-side-patterns")).toBeInTheDocument();
     expect(screen.queryByText("Reconnecting")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not render static mock rows while live data is loading", () => {
+    render(<FinalPage />);
+
+    expect(screen.getByRole("list", { name: "Final leaderboard" })).toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+    expect(screen.queryByText("@merdan")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/leaderboard?mode=final", {
       cache: "no-store",
     });

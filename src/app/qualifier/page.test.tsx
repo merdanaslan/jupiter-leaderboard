@@ -17,8 +17,11 @@ describe("QualifierPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders a static Solana Summit hero canvas", () => {
-    const { container } = render(<QualifierPage />);
+  it("renders a static Solana Summit hero canvas in mock live mode", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-13T12:00:00.000Z"));
+
+    const { container } = render(<SummitQualifierPage mockLive />);
 
     expect(
       screen.getByRole("img", { name: "Solana Summit Germany" }),
@@ -108,6 +111,15 @@ describe("QualifierPage", () => {
     expect(screen.getByText("-$2.40")).toBeInTheDocument();
     expect(screen.getByText("$87.90")).toBeInTheDocument();
     expect(screen.queryByText("Reconnecting")).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not render static mock rows while live data is loading", () => {
+    render(<QualifierPage />);
+
+    expect(screen.getByRole("list", { name: "Qualifier leaderboard" })).toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument();
+    expect(screen.queryByText("@merdan")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/leaderboard?mode=qualifier", {
       cache: "no-store",
     });

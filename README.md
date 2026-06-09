@@ -55,7 +55,9 @@ LEADERBOARD_STATE_ID=default
 LEADERBOARD_STATE_TABLE=leaderboard_state
 ```
 
-Apply `supabase/migrations/0001_leaderboard_state.sql` to create the minimal JSON state table. The app uses the service-role key only on server routes; do not expose it to client code. Set `LEADERBOARD_STATE_STORE=local` to force local JSON state during local development even when Supabase env vars exist.
+Apply the SQL files in `supabase/migrations/` to create and harden the JSON state table. The migrations enable RLS, revoke `anon`/`authenticated` table access, grant table access to `service_role`, and add a service-role-only RLS policy for the server-side REST calls. The app uses the service-role key only on server routes; never put it in `NEXT_PUBLIC_*` env vars or client code.
+
+The Supabase store includes an optimistic `version` column so concurrent Vercel function invocations retry instead of overwriting newer state. API responses also send explicit no-store headers so Vercel/browser caches do not serve stale leaderboard or operator state. Set `LEADERBOARD_STATE_STORE=local` to force local JSON state during local development even when Supabase env vars exist.
 
 ## Active Data Source
 

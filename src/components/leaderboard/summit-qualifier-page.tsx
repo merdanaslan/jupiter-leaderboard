@@ -77,7 +77,11 @@ export function SummitQualifierPage({
   const displayPayload = liveMode ? livePayload : apiLeaderboard.data;
   const celebrationPayload = displayPayload ?? livePayload;
   const isDynamic = liveMode || Boolean(apiLeaderboard.data);
-  const traders = displayPayload ? toSummitQualifierRows(displayPayload.traders) : QUALIFIER_TRADERS;
+  const traders = displayPayload
+    ? toSummitQualifierRows(displayPayload.traders)
+    : liveMode
+      ? QUALIFIER_TRADERS
+      : [];
   const timer = useSmoothLeaderboardTimer(displayPayload, QUALIFIER_TIMER);
   const orderedTraderIds = useMemo(() => traders.map((trader) => trader.id), [traders]);
   const registerMovingRow = useFlipListMovement(orderedTraderIds, isDynamic);

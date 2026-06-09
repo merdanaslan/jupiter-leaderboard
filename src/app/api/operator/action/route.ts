@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
+import { noStoreJson } from "@/app/api/no-store";
 import { applyOperatorStateAction } from "@/lib/runtime";
 
 const actionSchema = z.discriminatedUnion("type", [
@@ -52,8 +52,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const parsed = actionSchema.safeParse(await request.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid operator action" }, { status: 400 });
+    return noStoreJson({ error: "Invalid operator action" }, { status: 400 });
   }
 
-  return NextResponse.json(await applyOperatorStateAction(parsed.data));
+  return noStoreJson(await applyOperatorStateAction(parsed.data));
 }
