@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type MutableRefObject } from "react";
 import type confetti from "canvas-confetti";
 import {
   getFinalCelebrationEvent,
   getQualifierCelebrationEvent,
+  getRoundEndCelebrationDelayMs,
   isCelebrationCooldownReady,
 } from "@/lib/summit-celebration-events";
 import { getConfettiOriginFromRect } from "@/lib/summit-confetti-geometry";
@@ -35,30 +36,50 @@ export function useSummitCelebrations({
   const previousStatusRef = useRef(payload.state.status);
   const previousPositionTradersRef = useRef<PublicTraderScore[] | null>(null);
   const lastPositionBurstAtRef = useRef<number | null>(null);
-  const firedLockedAtRef = useRef<string | null>(null);
+  const firedLockedRoundRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) {
       previousStatusRef.current = payload.state.status;
       previousPositionTradersRef.current = null;
       lastPositionBurstAtRef.current = null;
-      firedLockedAtRef.current = null;
+      firedLockedRoundRef.current = null;
       return;
     }
 
-    const previousStatus = previousStatusRef.current;
-
     if (
-      previousStatus === "live" &&
       payload.state.status === "locked" &&
-      firedLockedAtRef.current !== payload.state.updatedAt
+      firedLockedRoundRef.current !== lockedCelebrationRoundKey(payload)
     ) {
-      firedLockedAtRef.current = payload.state.updatedAt;
-      void runSideCannons();
+      fireLockedRoundCannons(payload, firedLockedRoundRef);
     }
 
     previousStatusRef.current = payload.state.status;
   }, [enabled, payload.state.status, payload.state.updatedAt]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const delayMs = getRoundEndCelebrationDelayMs({
+      durationSeconds: payload.state.durationSeconds,
+      nowMs: Date.now(),
+      startedAt: payload.state.startedAt,
+      status: payload.state.status,
+    });
+    if (delayMs === null) return;
+
+    const timeout = window.setTimeout(() => {
+      fireLockedRoundCannons(payload, firedLockedRoundRef);
+    }, delayMs);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    enabled,
+    payload.state.durationSeconds,
+    payload.state.startedAt,
+    payload.state.status,
+    payload.state.updatedAt,
+  ]);
 
   useEffect(() => {
     if (!enabled || payload.state.status !== "live") {
@@ -90,6 +111,21 @@ export function useSummitCelebrations({
 
     previousPositionTradersRef.current = payload.traders;
   }, [enabled, mode, payload.state.status, payload.state.updatedAt, payload.traders]);
+}
+
+function fireLockedRoundCannons(
+  payload: PublicLeaderboardPayload,
+  firedLockedRoundRef: MutableRefObject<string | null>,
+): void {
+  const roundKey = lockedCelebrationRoundKey(payload);
+  if (firedLockedRoundRef.current === roundKey) return;
+
+  firedLockedRoundRef.current = roundKey;
+  void runSideCannons();
+}
+
+function lockedCelebrationRoundKey(payload: PublicLeaderboardPayload): string {
+  return payload.state.startedAt ?? payload.state.updatedAt;
 }
 
 async function runSideCannons(durationMs = SIDE_CANNON_DURATION_MS) {

@@ -3,6 +3,7 @@ import type {
   CompetitionMode,
   PublicLeaderboardPayload,
   PublicTraderScore,
+  RecentActivity,
   RecentTrade,
   RoundStatus,
   TradeMarket,
@@ -49,14 +50,16 @@ export type SummitFinalRow = SummitQualifierRow & {
   placement: "1st" | "2nd" | "3rd" | "4th";
   accent: SummitFinalAccent;
   recent: {
-    action: "OPEN" | "CLOSE" | "LIQ" | "FILL";
+    action: "OPEN" | "CLOSE" | "LIQ" | "FILL" | "DEPOSIT" | "WITHDRAW" | "PLACE LIMIT" | "CANCEL LIMIT" | "PLACE SL" | "CANCEL SL" | "PLACE TP" | "CANCEL TP";
     side: "LONG" | "SHORT";
     market: TradeMarket;
     pnl: string;
     detail: string;
     positive: boolean;
-  };
+  } | null;
 };
+
+type SummitRecentActivity = NonNullable<SummitFinalRow["recent"]>;
 
 const QUALIFIER_SEEDS: SummitTraderSeed[] = [
   seed("merdan", "@merdan", "Merdan", "MA", 36.8, 5_700, "SOL", "long", "decrease", 4.2, 681.2),
@@ -153,6 +156,14 @@ export function createSummitMockLeaderboardPayload(
         qualifier: null,
         final: null,
       },
+      liveDataStatus: {
+        qualifier: "idle",
+        final: "idle",
+      },
+      liveDataUpdatedAt: {
+        qualifier: null,
+        final: null,
+      },
       dataSource: "mock",
     },
     traders: publicLeaderboardView(rankedTraders),
@@ -168,7 +179,7 @@ export function toSummitFinalRows(traders: PublicTraderScore[]): SummitFinalRow[
     ...toSummitQualifierRow(trader),
     placement: placementForRank(trader.rank),
     accent: accentForRank(trader.rank),
-    recent: toSummitRecentTrade(trader.recentTrade),
+    recent: toSummitRecentActivity(trader),
   }));
 }
 
@@ -295,30 +306,79 @@ function toSummitQualifierRow(trader: PublicTraderScore): SummitQualifierRow {
   };
 }
 
-function toSummitRecentTrade(recentTrade: PublicTraderScore["recentTrade"]): SummitFinalRow["recent"] {
-  const fallback: RecentTrade = {
-    action: "increase",
-    market: "SOL",
-    side: "long",
-    notionalUsd: 0,
-    pnlUsd: 0,
-    timestamp: MOCK_STARTED_AT,
+function toSummitRecentActivity(trader: PublicTraderScore): SummitFinalRow["recent"] {
+  if (trader.recentActivity) return sdkRecentActivityToSummitRecent(trader.recentActivity);
+  return legacyRecentTradeToSummitRecent(trader.recentTrade);
+}
+
+function sdkRecentActivityToSummitRecent(activity: RecentActivity): SummitFinalRow["recent"] {
+  if (activity.type === "order") {
+    return {
+      action: `${activity.action === "place" ? "PLACE" : "CANCEL"} ${activity.orderKind}` as SummitRecentActivity["action"],
+      side: activity.side.toUpperCase() as "LONG" | "SHORT",
+      market: activity.market,
+      pnl: "--",
+      detail: activity.entirePosition
+        ? `full @ ${formatUsd(activity.triggerPriceUsd)}`
+        : `${formatUsd(activity.sizeUsd)} @ ${formatUsd(activity.triggerPriceUsd)}`,
+      positive: true,
+    };
+  }
+
+  if (activity.action === "deposit" || activity.action === "withdraw") {
+    const collateralDetail =
+      typeof activity.collateralUsdDelta === "number"
+        ? `${formatSignedUsd(activity.collateralUsdDelta)} collateral`
+        : "collateral";
+
+    return {
+      action: sdkTradeActionLabel(activity.action),
+      side: activity.side.toUpperCase() as "LONG" | "SHORT",
+      market: activity.market,
+      pnl: "--",
+      detail: collateralDetail,
+      positive: true,
+    };
+  }
+
+  const realizedPnlUsd = activity.netRealizedPnlUsd ?? activity.realizedPnlUsd;
+
+  return {
+    action: sdkTradeActionLabel(activity.action),
+    side: activity.side.toUpperCase() as "LONG" | "SHORT",
+    market: activity.market,
+    pnl: realizedPnlUsd === null ? "--" : formatSignedUsd(realizedPnlUsd),
+    detail: `${formatCompactUsd(activity.notionalUsd)} @ ${formatUsd(activity.priceUsd)}`,
+    positive: (realizedPnlUsd ?? 0) >= 0,
   };
-  const recent = recentTrade ?? fallback;
+}
+
+function legacyRecentTradeToSummitRecent(recentTrade: PublicTraderScore["recentTrade"]): SummitFinalRow["recent"] {
+  if (!recentTrade) return null;
+
+  const recent = recentTrade;
   const price = MARKET_PRICES[recent.market];
-  const quantity = recent.notionalUsd / price;
 
   return {
     action: actionLabel(recent.action),
     side: recent.side.toUpperCase() as "LONG" | "SHORT",
     market: recent.market,
     pnl: formatSignedUsd(recent.pnlUsd ?? 0),
-    detail: `${formatQuantity(quantity, recent.market)} @ ${formatUsd(price)}`,
+    detail: `${formatCompactUsd(recent.notionalUsd)} @ ${formatUsd(price)}`,
     positive: (recent.pnlUsd ?? 0) >= 0,
   };
 }
 
-function actionLabel(action: RecentTrade["action"]): SummitFinalRow["recent"]["action"] {
+function sdkTradeActionLabel(action: RecentActivity["action"]): SummitRecentActivity["action"] {
+  if (action === "deposit") return "DEPOSIT";
+  if (action === "withdraw") return "WITHDRAW";
+  if (action === "liquidation") return "LIQ";
+  if (action === "decrease" || action === "close") return "CLOSE";
+  if (action === "increase") return "FILL";
+  return "OPEN";
+}
+
+function actionLabel(action: RecentTrade["action"]): SummitRecentActivity["action"] {
   if (action === "decrease") return "CLOSE";
   if (action === "liquidate") return "LIQ";
   return "OPEN";
@@ -365,24 +425,28 @@ function formatUsd(value: number): string {
 }
 
 function formatSignedPercent(value: number): string {
-  const roundedValue = roundTo(value, 1);
-  const sign = roundedValue >= 0 ? "+" : "-";
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const fractionDigits = Math.abs(safeValue) > 0 && Math.abs(safeValue) < 1 ? 2 : 1;
+  const roundedValue = roundTo(safeValue, fractionDigits);
+  const displayValue = Object.is(roundedValue, -0) ? 0 : roundedValue;
+  const sign = displayValue < 0 ? "-" : "+";
 
-  return `${sign}${Math.abs(roundedValue).toFixed(1)}%`;
+  return `${sign}${Math.abs(displayValue).toFixed(fractionDigits)}%`;
 }
 
 function formatCompactUsd(value: number): string {
-  if (Math.abs(value) < 1_000) return `$${Math.round(value).toLocaleString("en-US")}`;
+  if (Math.abs(value) < 1_000) {
+    return new Intl.NumberFormat("en-US", {
+      currency: "USD",
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0,
+      style: "currency",
+    }).format(roundCurrency(value));
+  }
+
   if (Math.abs(value) < 1_000_000) return `$${(value / 1_000).toFixed(1)}K`;
 
   return `$${(value / 1_000_000).toFixed(1)}M`;
-}
-
-function formatQuantity(quantity: number, market: TradeMarket): string {
-  if (market === "BTC") return quantity.toFixed(3);
-  if (market === "ETH") return quantity.toFixed(2);
-
-  return quantity.toFixed(1);
 }
 
 function formatNumber(value: number, fractionDigits: number): string {

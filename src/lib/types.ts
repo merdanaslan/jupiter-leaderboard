@@ -23,6 +23,8 @@ export type TradeSide = "long" | "short";
 
 export type TradeMarket = "BTC" | "ETH" | "SOL";
 
+export type LeaderboardDataSourceId = "mock" | "jupiter-perps" | "jupiter-sdk";
+
 export interface RecentTrade {
   market: TradeMarket;
   side: TradeSide;
@@ -31,6 +33,49 @@ export interface RecentTrade {
   timestamp: string;
   action?: "increase" | "decrease" | "liquidate";
 }
+
+export type RecentActivityAction =
+  | "open"
+  | "increase"
+  | "decrease"
+  | "close"
+  | "liquidation"
+  | "deposit"
+  | "withdraw"
+  | "place"
+  | "cancel";
+
+export type RecentOrderKind = "LIMIT" | "SL" | "TP";
+
+export interface RecentTradeActivity {
+  type: "trade";
+  action: Exclude<RecentActivityAction, "place" | "cancel">;
+  market: TradeMarket;
+  side: TradeSide;
+  executionType: "market" | "trigger" | "liquidation";
+  notionalUsd: number;
+  sizeToken: number;
+  priceUsd: number;
+  collateralUsdDelta?: number;
+  realizedPnlUsd: number | null;
+  netRealizedPnlUsd?: number | null;
+  feeUsd: number;
+  timestamp: string;
+}
+
+export interface RecentOrderActivity {
+  type: "order";
+  action: Extract<RecentActivityAction, "place" | "cancel">;
+  orderKind: RecentOrderKind;
+  market: TradeMarket;
+  side: TradeSide;
+  triggerPriceUsd: number;
+  sizeUsd: number;
+  entirePosition: boolean;
+  timestamp: string;
+}
+
+export type RecentActivity = RecentTradeActivity | RecentOrderActivity;
 
 export interface OpenTrade {
   market: TradeMarket;
@@ -48,6 +93,7 @@ export interface TraderConfig {
   mode: CompetitionMode;
   startingBalance: number;
   startingEquity: number;
+  avatarUrl?: string;
 }
 
 export interface TraderScore extends TraderConfig {
@@ -59,6 +105,8 @@ export interface TraderScore extends TraderConfig {
   lastUpdated: string;
   gapToLeader: number;
   recentTrade?: RecentTrade;
+  recentActivity?: RecentActivity;
+  recentActivities?: RecentActivity[];
   openTrade?: OpenTrade;
 }
 
@@ -77,11 +125,32 @@ export interface RoundState {
     qualifier: TraderScore[] | null;
     final: TraderScore[] | null;
   };
+  liveStandings: {
+    qualifier: TraderScore[] | null;
+    final: TraderScore[] | null;
+  };
+  liveDataUpdatedAt: {
+    qualifier: string | null;
+    final: string | null;
+  };
+  liveDataStatus: {
+    qualifier: "idle" | "ok" | "partial" | "error";
+    final: "idle" | "ok" | "partial" | "error";
+  };
   mockTraders: TraderScore[];
-  dataSource: "mock" | "jupiter-perps";
+  traderConfigs: TraderConfig[];
+  sdkRuntime: {
+    orderSnapshotsByWallet: Record<string, unknown>;
+    orderActivitiesByWallet: Record<string, RecentActivity[]>;
+    lastError: string | null;
+  };
+  dataSource: LeaderboardDataSourceId;
 }
 
-export type PublicRoundState = Omit<RoundState, "mockTraders" | "lockedStandings"> & {
+export type PublicRoundState = Omit<
+  RoundState,
+  "mockTraders" | "lockedStandings" | "liveStandings" | "traderConfigs" | "sdkRuntime"
+> & {
   lockedStandings: {
     qualifier: PublicTraderScore[] | null;
     final: PublicTraderScore[] | null;

@@ -1,4 +1,4 @@
-import type { PublicTraderScore } from "./types";
+import type { PublicTraderScore, RoundStatus } from "./types";
 
 export type QualifierCelebrationEvent =
   | {
@@ -71,4 +71,23 @@ export function isCelebrationCooldownReady({
   cooldownMs: number;
 }): boolean {
   return lastTriggeredAt === null || now - lastTriggeredAt >= cooldownMs;
+}
+
+export function getRoundEndCelebrationDelayMs({
+  durationSeconds,
+  nowMs,
+  startedAt,
+  status,
+}: {
+  durationSeconds: number;
+  nowMs: number;
+  startedAt: string | null;
+  status: RoundStatus;
+}): number | null {
+  if (status !== "live" || !startedAt) return null;
+
+  const startedAtMs = new Date(startedAt).getTime();
+  if (!Number.isFinite(startedAtMs)) return null;
+
+  return Math.max(0, startedAtMs + durationSeconds * 1_000 - nowMs);
 }

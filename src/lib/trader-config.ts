@@ -11,6 +11,7 @@ const traderConfigSchema = z.object({
   mode: z.enum(["qualifier", "final"]),
   startingBalance: z.coerce.number().nonnegative(),
   startingEquity: z.coerce.number().nonnegative(),
+  avatarUrl: z.string().optional(),
 });
 
 const traderConfigArraySchema = z.array(traderConfigSchema);

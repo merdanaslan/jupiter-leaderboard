@@ -9,7 +9,7 @@ interface LeaderboardState {
   error: string | null;
 }
 
-export function useLeaderboard(mode: CompetitionMode, intervalMs = 1800): LeaderboardState {
+export function useLeaderboard(mode: CompetitionMode, intervalMs = 1800, enabled = true): LeaderboardState {
   const [state, setState] = useState<LeaderboardState>({
     data: null,
     isLoading: true,
@@ -19,6 +19,13 @@ export function useLeaderboard(mode: CompetitionMode, intervalMs = 1800): Leader
   useEffect(() => {
     let active = true;
     let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    if (!enabled) {
+      setState({ data: null, isLoading: false, error: null });
+      return () => {
+        active = false;
+      };
+    }
 
     async function load() {
       try {
@@ -47,7 +54,7 @@ export function useLeaderboard(mode: CompetitionMode, intervalMs = 1800): Leader
       active = false;
       if (timeout) clearTimeout(timeout);
     };
-  }, [intervalMs, mode]);
+  }, [enabled, intervalMs, mode]);
 
   return state;
 }

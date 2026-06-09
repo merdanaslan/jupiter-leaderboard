@@ -17,7 +17,7 @@ describe("FinalPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders a static Solana Summit final leaderboard without fetching leaderboard data", () => {
+  it("renders a static Solana Summit final leaderboard while polling leaderboard data", () => {
     const { container } = render(<FinalPage />);
 
     expect(
@@ -77,12 +77,12 @@ describe("FinalPage", () => {
     );
     expect(container.querySelector(".final-board-mobile-header")).toHaveClass(
       "grid",
-      "sm:hidden",
+      "lg:hidden",
     );
     expect(screen.getByText("Trader")).toBeInTheDocument();
     expect(screen.getByText("Trader / X handle")).toBeInTheDocument();
     expect(screen.getByText("Recent activity")).toBeInTheDocument();
-    expect(screen.getByText("PnL USD")).toBeInTheDocument();
+    expect(screen.getByText("Net PnL USD")).toBeInTheDocument();
     expect(screen.getByText("PnL %")).toBeInTheDocument();
     expect(container.querySelector(".final-leader-spotlight")).not.toBeInTheDocument();
     expect(container.querySelector(".final-challenger-stack")).not.toBeInTheDocument();
@@ -125,7 +125,8 @@ describe("FinalPage", () => {
       expect(row.querySelector(".finalist-trader-lockup")).toBeInTheDocument();
       expect(row.querySelector(".final-row-main-pnl")).toBeInTheDocument();
       expect(row.querySelector(".final-row-recent-activity")).toBeInTheDocument();
-      expect(row.querySelector(".final-row-recent-detail")).toBeInTheDocument();
+      expect(row.querySelector(".final-row-recent-detail")).not.toBeInTheDocument();
+      expect(row).toHaveTextContent("--");
       expect(within(row).queryByText("Recent")).not.toBeInTheDocument();
       expect(row.querySelector(".final-race-track")).not.toBeInTheDocument();
       expect(row.querySelector(".final-race-progress")).not.toBeInTheDocument();
@@ -140,22 +141,15 @@ describe("FinalPage", () => {
     expect(finalistRows[0]).toHaveTextContent("+43.5%");
     expect(finalistRows[0]).toHaveTextContent("$1,435.00");
     expect(finalistRows[0]).toHaveTextContent("$63.6K");
-    expect(finalistRows[0]).toHaveTextContent("CLOSE");
-    expect(finalistRows[0]).toHaveTextContent("LONG");
-    expect(finalistRows[0]).toHaveTextContent("SOL");
-    expect(finalistRows[0]).toHaveTextContent("+$42.00");
-    expect(finalistRows[0]).toHaveTextContent("18.2 @ $162.40");
+    expect(finalistRows[0]).not.toHaveTextContent("CLOSE");
+    expect(finalistRows[0]).not.toHaveTextContent("18.2 @ $162.40");
     expect(finalistRows[1]).toHaveTextContent("+$428.00");
     expect(finalistRows[1]).toHaveTextContent("$1,428.00");
     expect(finalistRows[1]).toHaveTextContent("$59.2K");
     expect(finalistRows[1]).toHaveTextContent("#2");
     expect(finalistRows[2]).toHaveTextContent("#3");
     expect(finalistRows[3]).toHaveTextContent("#4");
-    expect(finalistRows[3]).toHaveTextContent("SOL");
     expect(finalistRows[3]).not.toHaveTextContent("JUP");
-    expect(
-      finalistRows.every((row) => ["BTC", "ETH", "SOL"].some((market) => row.textContent?.includes(market))),
-    ).toBe(true);
     expect(screen.queryByText("VS")).not.toBeInTheDocument();
     expect(container.querySelectorAll(".final-gap-divider")).toHaveLength(0);
     expect(container.querySelectorAll(".final-gap-value")).toHaveLength(0);
@@ -163,11 +157,14 @@ describe("FinalPage", () => {
     expect(container.querySelectorAll(".final-race-gap")).toHaveLength(0);
     expect(container.querySelector(".summit-final-side-patterns")).toBeInTheDocument();
     expect(screen.queryByText("Reconnecting")).not.toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith("/api/leaderboard?mode=final", {
+      cache: "no-store",
+    });
   });
 
   it("can simulate live final updates without fetching backend data", () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-13T12:00:00.000Z"));
 
     render(<SummitFinalPage mockLive />);
 
@@ -189,6 +186,7 @@ describe("FinalPage", () => {
 
   it("can shorten the final mock timer for celebration testing", () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-13T12:00:00.000Z"));
 
     render(<SummitFinalPage mockLive mockDurationSeconds={6} />);
 

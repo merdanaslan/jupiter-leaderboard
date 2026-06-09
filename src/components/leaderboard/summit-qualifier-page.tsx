@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { Fragment, useMemo } from "react";
 import {
-  formatSummitTimerFromPayload,
   toSummitQualifierRows,
 } from "@/lib/summit-live-leaderboard";
 import type { SummitQualifierRow } from "@/lib/summit-live-leaderboard";
@@ -15,6 +14,8 @@ import {
   useSummitMockLiveFlag,
 } from "./use-summit-mock-live";
 import { useSummitCelebrations } from "./use-summit-celebrations";
+import { useLeaderboard } from "./useLeaderboard";
+import { useSmoothLeaderboardTimer } from "./useSmoothLeaderboardTimer";
 
 const QUALIFIER_TIMER = "60:00";
 
@@ -72,11 +73,15 @@ export function SummitQualifierPage({
     liveMode,
     liveMockDurationSeconds ? { durationSeconds: liveMockDurationSeconds } : undefined,
   );
-  const traders = liveMode ? toSummitQualifierRows(livePayload.traders) : QUALIFIER_TRADERS;
-  const timer = liveMode ? formatSummitTimerFromPayload(livePayload) : QUALIFIER_TIMER;
+  const apiLeaderboard = useLeaderboard("qualifier", 4_500, !liveMode);
+  const displayPayload = liveMode ? livePayload : apiLeaderboard.data;
+  const celebrationPayload = displayPayload ?? livePayload;
+  const isDynamic = liveMode || Boolean(apiLeaderboard.data);
+  const traders = displayPayload ? toSummitQualifierRows(displayPayload.traders) : QUALIFIER_TRADERS;
+  const timer = useSmoothLeaderboardTimer(displayPayload, QUALIFIER_TIMER);
   const orderedTraderIds = useMemo(() => traders.map((trader) => trader.id), [traders]);
-  const registerMovingRow = useFlipListMovement(orderedTraderIds, liveMode);
-  useSummitCelebrations({ enabled: liveMode, mode: "qualifier", payload: livePayload });
+  const registerMovingRow = useFlipListMovement(orderedTraderIds, isDynamic);
+  useSummitCelebrations({ enabled: isDynamic, mode: "qualifier", payload: celebrationPayload });
 
   return (
     <main className="summit-theme min-h-screen bg-black text-white">
@@ -143,7 +148,7 @@ export function SummitQualifierPage({
                 <QualifierRow
                   trader={trader}
                   rowRef={registerMovingRow(trader.id)}
-                  live={liveMode}
+                  live={isDynamic}
                 />
                 {trader.rank === 4 ? <QualificationDivider /> : null}
               </Fragment>
@@ -239,7 +244,7 @@ function MobileBoardHeader() {
     <div className="qualifier-mobile-board-header mx-auto mb-1 grid max-w-[1320px] grid-cols-[44px_minmax(0,1fr)_minmax(96px,auto)] gap-2 px-3 text-[11px] font-black uppercase tracking-[0.14em] text-[#c2bfca]/82 sm:hidden">
       <span>Rank</span>
       <span>Trader</span>
-      <span className="text-right">PnL</span>
+      <span className="text-right">Net PnL</span>
     </div>
   );
 }
@@ -249,7 +254,7 @@ function BoardHeader() {
     <div className="mx-auto mb-1 hidden max-w-[1320px] grid-cols-[72px_minmax(210px,1.7fr)_minmax(140px,0.8fr)_minmax(110px,0.65fr)_minmax(130px,0.7fr)_minmax(120px,0.65fr)] gap-4 px-6 text-[12px] font-black uppercase tracking-[0.16em] text-[#c2bfca]/78 sm:grid">
       <span>Rank</span>
       <span>Trader / X handle</span>
-      <span>PnL USD</span>
+      <span>Net PnL USD</span>
       <span>PnL %</span>
       <span>Equity</span>
       <span>Volume</span>
@@ -295,7 +300,7 @@ function QualificationDivider() {
     >
       <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#14f195]/45 to-[#14f195]/20" />
       <div className="rounded-full border border-[#14f195]/45 bg-black/80 px-4 py-2 text-center text-[12px] font-black uppercase tracking-[0.16em] shadow-[0_0_26px_rgba(20,241,149,0.12)]">
-        Top 4 qualify for the final
+        Top 4 Qualify for the Final
       </div>
       <div className="h-px flex-1 bg-gradient-to-l from-transparent via-[#14f195]/45 to-[#14f195]/20" />
     </div>

@@ -69,7 +69,7 @@ describe("QualifierPage", () => {
       "sm:hidden",
     );
     expect(screen.getByText("Trader / X handle")).toBeInTheDocument();
-    expect(screen.getByText("PnL USD")).toBeInTheDocument();
+    expect(screen.getByText("Net PnL USD")).toBeInTheDocument();
     expect(screen.getByText("PnL %")).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(25);
     expect(screen.getAllByRole("listitem")[0]).toHaveClass("sm:min-h-[56px]");
@@ -90,12 +90,12 @@ describe("QualifierPage", () => {
     expect(
       screen.getAllByRole("listitem").filter((row) => row.dataset.qualifying === "true"),
     ).toHaveLength(4);
-    expect(screen.getByText("Top 4 qualify for the final")).toBeInTheDocument();
+    expect(screen.getByText("Top 4 Qualify for the Final")).toBeInTheDocument();
     expect(
-      screen.getByText("Top 4 qualify for the final").closest("[data-qualification-divider='true']"),
+      screen.getByText("Top 4 Qualify for the Final").closest("[data-qualification-divider='true']"),
     ).toHaveClass("qualification-divider");
     expect(
-      screen.getByText("Top 4 qualify for the final").closest("[data-qualification-divider='true']")
+      screen.getByText("Top 4 Qualify for the Final").closest("[data-qualification-divider='true']")
         ?.parentElement,
     ).toBe(screen.getByRole("list", { name: "Qualifier leaderboard" }));
     expect(screen.getByText("#1")).toBeInTheDocument();
@@ -108,11 +108,14 @@ describe("QualifierPage", () => {
     expect(screen.getByText("-$2.40")).toBeInTheDocument();
     expect(screen.getByText("$87.90")).toBeInTheDocument();
     expect(screen.queryByText("Reconnecting")).not.toBeInTheDocument();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith("/api/leaderboard?mode=qualifier", {
+      cache: "no-store",
+    });
   });
 
   it("can simulate live qualifier updates without fetching backend data", () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-13T12:00:00.000Z"));
 
     render(<SummitQualifierPage mockLive />);
 
@@ -135,6 +138,7 @@ describe("QualifierPage", () => {
 
   it("can shorten the qualifier mock timer for celebration testing", () => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-13T12:00:00.000Z"));
 
     render(<SummitQualifierPage mockLive mockDurationSeconds={6} />);
 

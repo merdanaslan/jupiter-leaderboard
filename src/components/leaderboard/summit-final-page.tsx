@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { Fragment, useMemo } from "react";
 import {
-  formatSummitTimerFromPayload,
   toSummitFinalRows,
 } from "@/lib/summit-live-leaderboard";
 import type { SummitFinalRow } from "@/lib/summit-live-leaderboard";
@@ -15,6 +14,8 @@ import {
   useSummitMockLiveFlag,
 } from "./use-summit-mock-live";
 import { useSummitCelebrations } from "./use-summit-celebrations";
+import { useLeaderboard } from "./useLeaderboard";
+import { useSmoothLeaderboardTimer } from "./useSmoothLeaderboardTimer";
 
 const FINAL_TIMER = "30:00";
 
@@ -31,14 +32,7 @@ const STATIC_FINALISTS: Array<Omit<SummitFinalRow, "id">> = [
     equity: "$1,435.00",
     volume: "$63.6K",
     positive: true,
-    recent: {
-      action: "CLOSE",
-      side: "LONG",
-      market: "SOL",
-      pnl: "+$42.00",
-      detail: "18.2 @ $162.40",
-      positive: true,
-    },
+    recent: null,
   },
   {
     rank: 2,
@@ -52,14 +46,7 @@ const STATIC_FINALISTS: Array<Omit<SummitFinalRow, "id">> = [
     equity: "$1,428.00",
     volume: "$59.2K",
     positive: true,
-    recent: {
-      action: "OPEN",
-      side: "LONG",
-      market: "BTC",
-      pnl: "+$11.80",
-      detail: "0.018 @ $68,240",
-      positive: true,
-    },
+    recent: null,
   },
   {
     rank: 3,
@@ -73,14 +60,7 @@ const STATIC_FINALISTS: Array<Omit<SummitFinalRow, "id">> = [
     equity: "$1,414.00",
     volume: "$54.8K",
     positive: true,
-    recent: {
-      action: "CLOSE",
-      side: "SHORT",
-      market: "ETH",
-      pnl: "-$9.50",
-      detail: "0.46 @ $3,120",
-      positive: false,
-    },
+    recent: null,
   },
   {
     rank: 4,
@@ -94,14 +74,7 @@ const STATIC_FINALISTS: Array<Omit<SummitFinalRow, "id">> = [
     equity: "$1,387.00",
     volume: "$50.6K",
     positive: true,
-    recent: {
-      action: "FILL",
-      side: "LONG",
-      market: "SOL",
-      pnl: "+$7.20",
-      detail: "4.6 @ $162.40",
-      positive: true,
-    },
+    recent: null,
   },
 ] as const;
 
@@ -141,11 +114,15 @@ export function SummitFinalPage({
     liveMode,
     liveMockDurationSeconds ? { durationSeconds: liveMockDurationSeconds } : undefined,
   );
-  const finalists = liveMode ? toSummitFinalRows(livePayload.traders) : FINALISTS;
-  const timer = liveMode ? formatSummitTimerFromPayload(livePayload) : FINAL_TIMER;
+  const apiLeaderboard = useLeaderboard("final", 2_000, !liveMode);
+  const displayPayload = liveMode ? livePayload : apiLeaderboard.data;
+  const celebrationPayload = displayPayload ?? livePayload;
+  const isDynamic = liveMode || Boolean(apiLeaderboard.data);
+  const finalists = displayPayload ? toSummitFinalRows(displayPayload.traders) : FINALISTS;
+  const timer = useSmoothLeaderboardTimer(displayPayload, FINAL_TIMER);
   const orderedFinalistIds = useMemo(() => finalists.map((finalist) => finalist.id), [finalists]);
-  const registerMovingRow = useFlipListMovement(orderedFinalistIds, liveMode);
-  useSummitCelebrations({ enabled: liveMode, mode: "final", payload: livePayload });
+  const registerMovingRow = useFlipListMovement(orderedFinalistIds, isDynamic);
+  useSummitCelebrations({ enabled: isDynamic, mode: "final", payload: celebrationPayload });
 
   return (
     <main className="summit-theme min-h-screen bg-black text-white">
@@ -212,7 +189,7 @@ export function SummitFinalPage({
                 key={finalist.id}
                 finalist={finalist}
                 rowRef={registerMovingRow(finalist.id)}
-                live={liveMode}
+                live={isDynamic}
               />
             ))}
           </div>
@@ -244,10 +221,10 @@ function FinalBoardTitle() {
 
 function MobileFinalBoardHeader() {
   return (
-    <div className="final-board-mobile-header mx-auto mb-1 grid max-w-[1320px] grid-cols-[54px_minmax(0,1fr)_minmax(112px,auto)] gap-2 px-3 text-[11px] font-black uppercase tracking-[0.14em] text-[#c2bfca]/82 sm:hidden">
+    <div className="final-board-mobile-header mx-auto mb-1 grid max-w-[1320px] grid-cols-[54px_minmax(0,1fr)_minmax(112px,auto)] gap-2 px-3 text-[11px] font-black uppercase tracking-[0.14em] text-[#c2bfca]/82 lg:hidden">
       <span>Rank</span>
       <span>Trader</span>
-      <span className="text-right">PnL</span>
+      <span className="text-right">Net PnL</span>
       <span className="sr-only">Recent</span>
     </div>
   );
@@ -255,10 +232,10 @@ function MobileFinalBoardHeader() {
 
 function FinalBoardHeader() {
   return (
-    <div className="mx-auto mb-1 hidden max-w-[1320px] grid-cols-[86px_minmax(220px,1.35fr)_minmax(140px,0.75fr)_minmax(110px,0.55fr)_minmax(130px,0.65fr)_minmax(120px,0.6fr)_minmax(280px,1fr)] gap-4 px-6 text-[12px] font-black uppercase tracking-[0.16em] text-[#f1edf7]/82 sm:grid">
+    <div className="mx-auto mb-1 hidden max-w-[1320px] grid-cols-[64px_minmax(140px,1.1fr)_minmax(90px,0.65fr)_minmax(64px,0.45fr)_minmax(86px,0.55fr)_minmax(70px,0.45fr)_minmax(250px,1fr)] gap-3 px-4 text-[12px] font-black uppercase tracking-[0.16em] text-[#f1edf7]/82 lg:grid xl:grid-cols-[76px_minmax(190px,1.25fr)_minmax(124px,0.7fr)_minmax(90px,0.5fr)_minmax(116px,0.58fr)_minmax(96px,0.52fr)_minmax(280px,1fr)] xl:gap-4 xl:px-6">
       <span>Rank</span>
       <span>Trader / X handle</span>
-      <span>PnL USD</span>
+      <span>Net PnL USD</span>
       <span>PnL %</span>
       <span>Equity</span>
       <span>Volume</span>
@@ -287,7 +264,7 @@ function FinalRow({
       data-live={live ? "true" : "false"}
       aria-label={`${finalist.placement} place, ${finalist.handle}`}
       className={cn(
-        "final-board-row qualifier-board-row qualifier-row-glass grid min-h-[84px] grid-cols-[54px_minmax(0,1fr)_minmax(112px,auto)] items-center gap-x-2 gap-y-1.5 border px-3 py-2.5 transition-colors sm:min-h-[86px] sm:grid-cols-[86px_minmax(220px,1.35fr)_minmax(140px,0.75fr)_minmax(110px,0.55fr)_minmax(130px,0.65fr)_minmax(120px,0.6fr)_minmax(280px,1fr)] sm:gap-x-4 sm:px-6 lg:min-h-[92px]",
+        "final-board-row qualifier-board-row qualifier-row-glass grid min-h-[84px] grid-cols-[54px_minmax(0,1fr)_minmax(112px,auto)] items-center gap-x-2 gap-y-1.5 border px-3 py-2.5 transition-colors lg:min-h-[92px] lg:grid-cols-[64px_minmax(140px,1.1fr)_minmax(90px,0.65fr)_minmax(64px,0.45fr)_minmax(86px,0.55fr)_minmax(70px,0.45fr)_minmax(250px,1fr)] lg:gap-x-3 lg:px-4 xl:grid-cols-[76px_minmax(190px,1.25fr)_minmax(124px,0.7fr)_minmax(90px,0.5fr)_minmax(116px,0.58fr)_minmax(96px,0.52fr)_minmax(280px,1fr)] xl:gap-x-4 xl:px-6",
         FINAL_ROW_CLASSES[finalist.accent],
       )}
     >
@@ -318,9 +295,9 @@ function FinalRow({
         dominant
         positive={finalist.positive}
       />
-      <CompactMetric className="hidden sm:block" value={finalist.pnlPercent} positive={finalist.positive} />
-      <CompactMetric className="hidden sm:block" value={finalist.equity} />
-      <CompactMetric className="hidden sm:block" value={finalist.volume} muted />
+      <CompactMetric className="hidden lg:block" value={finalist.pnlPercent} positive={finalist.positive} />
+      <CompactMetric className="hidden lg:block" value={finalist.equity} />
+      <CompactMetric className="hidden lg:block" value={finalist.volume} muted />
       <RecentActivity recent={finalist.recent} />
     </article>
   );
@@ -342,7 +319,7 @@ function CompactMetric({
   return (
     <p
       className={cn(
-        "text-right font-mono text-[17px] font-black leading-none tabular-nums sm:text-left sm:text-[18px]",
+        "text-right font-mono text-[17px] font-black leading-none tabular-nums sm:text-[18px] lg:text-left",
         dominant && "text-[20px] sm:text-[22px] lg:text-[24px]",
         dominant && positive && "text-[#14f195]",
         dominant && !positive && "text-[#ff6b8a]",
@@ -357,8 +334,16 @@ function CompactMetric({
 }
 
 function RecentActivity({ recent }: { recent: RecentTrade }) {
+  if (!recent) {
+    return (
+      <div className="final-row-recent-activity col-span-3 min-w-0 border-t border-white/[0.08] pt-2 lg:col-auto lg:border-t-0 lg:pt-0">
+        <span className="font-mono text-[16px] font-black leading-none text-white/32">--</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="final-row-recent-activity col-span-3 min-w-0 border-t border-white/[0.08] pt-2 sm:col-auto sm:border-t-0 sm:pt-0">
+    <div className="final-row-recent-activity col-span-3 min-w-0 border-t border-white/[0.08] pt-2 lg:col-auto lg:border-t-0 lg:pt-0">
       <div className="flex min-w-0 items-center gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="final-activity-action rounded px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.08em]">

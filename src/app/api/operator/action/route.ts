@@ -19,6 +19,17 @@ const actionSchema = z.discriminatedUnion("type", [
     mode: z.enum(["qualifier", "final"]),
   }),
   z.object({
+    type: z.literal("setDataSource"),
+    dataSource: z.enum(["mock", "jupiter-sdk"]),
+  }),
+  z.object({
+    type: z.literal("importTraderConfig"),
+    contents: z.string().min(1),
+  }),
+  z.object({
+    type: z.literal("clearTraderConfig"),
+  }),
+  z.object({
     type: z.literal("setScenario"),
     scenario: z.enum([
       "steady",

@@ -42,4 +42,89 @@ describe("applyOperatorAction", () => {
 
     expect(state.scenario).toBe("top-4-battle");
   });
+
+  it("clears imported trader config and SDK round state", () => {
+    const initial = createInitialRoundState();
+    const state = applyOperatorAction(
+      {
+        ...initial,
+        dataSource: "jupiter-sdk",
+        liveDataStatus: {
+          qualifier: "ok",
+          final: "ok",
+        },
+        liveDataUpdatedAt: {
+          qualifier: "2026-06-08T10:00:00.000Z",
+          final: "2026-06-08T10:00:00.000Z",
+        },
+        liveStandings: {
+          qualifier: null,
+          final: [
+            {
+              displayName: "Test Trader",
+              equity: 1000,
+              gapToLeader: 0,
+              id: "test-wallet",
+              lastUpdated: "2026-06-08T10:00:00.000Z",
+              mode: "final",
+              pnlPercent: 0,
+              pnlUsd: 0,
+              rank: 1,
+              startingBalance: 1000,
+              startingEquity: 1000,
+              status: "active",
+              volume: 0,
+              walletAddress: "7orgFWEBNCsqspUTX8AZurjRfHrgRYZiswm4ewqJmH9E",
+              xHandle: "@testtrader",
+            },
+          ],
+        },
+        lockedStandings: {
+          qualifier: null,
+          final: [],
+        },
+        remainingSeconds: 120,
+        sdkRuntime: {
+          lastError: "previous error",
+          orderActivitiesByWallet: {
+            "7orgFWEBNCsqspUTX8AZurjRfHrgRYZiswm4ewqJmH9E": [],
+          },
+          orderSnapshotsByWallet: {
+            "7orgFWEBNCsqspUTX8AZurjRfHrgRYZiswm4ewqJmH9E": {},
+          },
+        },
+        selectedFinalistIds: ["test-wallet"],
+        startedAt: "2026-06-08T10:00:00.000Z",
+        status: "live",
+        traderConfigs: [
+          {
+            displayName: "Test Trader",
+            id: "test-wallet",
+            mode: "final",
+            startingBalance: 1000,
+            startingEquity: 1000,
+            status: "active",
+            walletAddress: "7orgFWEBNCsqspUTX8AZurjRfHrgRYZiswm4ewqJmH9E",
+            xHandle: "@testtrader",
+          },
+        ],
+      },
+      { type: "clearTraderConfig" },
+    );
+
+    expect(state.traderConfigs).toEqual([]);
+    expect(state.selectedFinalistIds).toEqual([]);
+    expect(state.liveStandings).toEqual({ qualifier: null, final: null });
+    expect(state.lockedStandings).toEqual({ qualifier: null, final: null });
+    expect(state.liveDataStatus).toEqual({ qualifier: "idle", final: "idle" });
+    expect(state.liveDataUpdatedAt).toEqual({ qualifier: null, final: null });
+    expect(state.sdkRuntime).toEqual({
+      lastError: null,
+      orderActivitiesByWallet: {},
+      orderSnapshotsByWallet: {},
+    });
+    expect(state.startedAt).toBeNull();
+    expect(state.status).toBe("waiting");
+    expect(state.remainingSeconds).toBe(state.durationSeconds);
+  });
 });

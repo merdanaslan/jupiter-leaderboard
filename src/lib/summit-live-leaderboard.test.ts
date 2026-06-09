@@ -5,6 +5,7 @@ import {
   toSummitFinalRows,
   toSummitQualifierRows,
 } from "./summit-live-leaderboard";
+import type { PublicTraderScore } from "./types";
 
 describe("summit live leaderboard mock feed", () => {
   it("emits qualifier snapshots in the backend public payload shape", () => {
@@ -119,5 +120,233 @@ describe("summit live leaderboard mock feed", () => {
     expect(payload.state.durationSeconds).toBe(6);
     expect(payload.state.remainingSeconds).toBe(0);
     expect(payload.state.status).toBe("locked");
+  });
+
+  it("maps SDK recent activity into the final recent activity display shape", () => {
+    const trader: PublicTraderScore = {
+      displayName: "SDK Trader",
+      equity: 100.4,
+      gapToLeader: 0,
+      id: "sdk-trader",
+      lastUpdated: "2026-06-07T09:00:00.000Z",
+      mode: "final",
+      pnlPercent: 0.04,
+      pnlUsd: 0.4,
+      rank: 1,
+      startingBalance: 1000,
+      startingEquity: 1000,
+      status: "active",
+      volume: 42,
+      xHandle: "@sdk",
+      recentActivity: {
+        action: "place",
+        entirePosition: false,
+        market: "SOL",
+        orderKind: "TP",
+        side: "long",
+        sizeUsd: 11.98,
+        timestamp: "2026-06-07T09:00:00.000Z",
+        triggerPriceUsd: 65,
+        type: "order",
+      },
+    };
+
+    const [row] = toSummitFinalRows([trader]);
+
+    expect(row.recent).toEqual({
+      action: "PLACE TP",
+      detail: "$11.98 @ $65.00",
+      market: "SOL",
+      pnl: "--",
+      positive: true,
+      side: "LONG",
+    });
+  });
+
+  it("uses USD notional for SDK trade activity details and exact small volume", () => {
+    const trader: PublicTraderScore = {
+      displayName: "SDK Trader",
+      equity: 999.89,
+      gapToLeader: 0,
+      id: "sdk-trader",
+      lastUpdated: "2026-06-07T09:00:00.000Z",
+      mode: "final",
+      pnlPercent: -0.011,
+      pnlUsd: -0.11,
+      rank: 1,
+      startingBalance: 1000,
+      startingEquity: 1000,
+      status: "active",
+      volume: 30.91,
+      xHandle: "@sdk",
+      recentActivity: {
+        action: "open",
+        executionType: "market",
+        feeUsd: 0.02,
+        market: "SOL",
+        notionalUsd: 30.91,
+        priceUsd: 66.7,
+        realizedPnlUsd: null,
+        side: "short",
+        sizeToken: 0.4634,
+        timestamp: "2026-06-07T09:00:00.000Z",
+        type: "trade",
+      },
+    };
+
+    const [row] = toSummitFinalRows([trader]);
+
+    expect(row.pnlPercent).toBe("-0.01%");
+    expect(row.volume).toBe("$30.91");
+    expect(row.recent).toMatchObject({
+      action: "OPEN",
+      detail: "$30.91 @ $66.70",
+      market: "SOL",
+      pnl: "--",
+      side: "SHORT",
+    });
+  });
+
+  it("labels SDK collateral-only recent activity as deposit or withdraw", () => {
+    const baseTrader: PublicTraderScore = {
+      displayName: "SDK Trader",
+      equity: 999.99,
+      gapToLeader: 0,
+      id: "sdk-trader",
+      lastUpdated: "2026-06-07T09:00:00.000Z",
+      mode: "final",
+      pnlPercent: -0.001,
+      pnlUsd: -0.01,
+      rank: 1,
+      startingBalance: 1000,
+      startingEquity: 1000,
+      status: "active",
+      volume: 21.27,
+      xHandle: "@sdk",
+    };
+    const depositTrader: PublicTraderScore = {
+      ...baseTrader,
+      recentActivity: {
+        action: "deposit",
+        collateralUsdDelta: -1,
+        executionType: "market",
+        feeUsd: 0,
+        market: "SOL",
+        notionalUsd: 0,
+        priceUsd: 66.79,
+        realizedPnlUsd: null,
+        side: "short",
+        sizeToken: 0,
+        timestamp: "2026-06-07T09:00:00.000Z",
+        type: "trade",
+      },
+    };
+    const withdrawTrader: PublicTraderScore = {
+      ...baseTrader,
+      id: "sdk-trader-withdraw",
+      recentActivity: {
+        action: "withdraw",
+        collateralUsdDelta: 0.98,
+        executionType: "market",
+        feeUsd: 0,
+        market: "SOL",
+        notionalUsd: 0,
+        priceUsd: 66.79,
+        realizedPnlUsd: null,
+        side: "short",
+        sizeToken: 0,
+        timestamp: "2026-06-07T09:01:00.000Z",
+        type: "trade",
+      },
+    };
+
+    const [depositRow, withdrawRow] = toSummitFinalRows([depositTrader, withdrawTrader]);
+
+    expect(depositRow.recent).toMatchObject({
+      action: "DEPOSIT",
+      detail: "-$1.00 collateral",
+      market: "SOL",
+      pnl: "--",
+      side: "SHORT",
+    });
+    expect(withdrawRow.recent).toMatchObject({
+      action: "WITHDRAW",
+      detail: "+$0.98 collateral",
+      market: "SOL",
+      pnl: "--",
+      side: "SHORT",
+    });
+  });
+
+  it("does not display negative zero for tiny PnL percentages", () => {
+    const trader: PublicTraderScore = {
+      displayName: "SDK Trader",
+      equity: 999.99,
+      gapToLeader: 0,
+      id: "sdk-trader",
+      lastUpdated: "2026-06-07T09:00:00.000Z",
+      mode: "final",
+      pnlPercent: -0.0004,
+      pnlUsd: -0.01,
+      rank: 1,
+      startingBalance: 1000,
+      startingEquity: 1000,
+      status: "active",
+      volume: 1,
+      xHandle: "@sdk",
+    };
+
+    const [row] = toSummitFinalRows([trader]);
+
+    expect(row.pnlPercent).toBe("+0.00%");
+  });
+
+  it("keeps large leaderboard numbers compact enough for the display", () => {
+    const trader: PublicTraderScore = {
+      displayName: "Large Number Trader",
+      equity: 12_345.67,
+      gapToLeader: 0,
+      id: "large-number-trader",
+      lastUpdated: "2026-06-07T09:00:00.000Z",
+      mode: "final",
+      pnlPercent: 234.567,
+      pnlUsd: 2_345.67,
+      rank: 1,
+      startingBalance: 1000,
+      startingEquity: 1000,
+      status: "active",
+      volume: 1_234_567,
+      xHandle: "@large",
+    };
+
+    const [row] = toSummitFinalRows([trader]);
+
+    expect(row.pnlUsd).toBe("+$2,345.67");
+    expect(row.pnlPercent).toBe("+234.6%");
+    expect(row.equity).toBe("$12,345.67");
+    expect(row.volume).toBe("$1.2M");
+  });
+
+  it("does not synthesize recent activity for configured traders with no trades yet", () => {
+    const trader: PublicTraderScore = {
+      displayName: "SDK Trader",
+      equity: 1000,
+      gapToLeader: 0,
+      id: "sdk-trader",
+      lastUpdated: "2026-06-07T09:00:00.000Z",
+      mode: "final",
+      pnlPercent: 0,
+      pnlUsd: 0,
+      rank: 1,
+      startingBalance: 1000,
+      startingEquity: 1000,
+      status: "active",
+      volume: 0,
+      xHandle: "@sdk",
+    };
+
+    const [row] = toSummitFinalRows([trader]);
+
+    expect(row.recent).toBeNull();
   });
 });

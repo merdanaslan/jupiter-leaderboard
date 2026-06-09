@@ -68,7 +68,9 @@ interface TradeRecentActivity {
   sizeUsd: number;
   sizeToken: number;
   executionPriceUsd: number;
+  collateralUsdDelta?: number;
   realizedPnlUsd: number | null;
+  netRealizedPnlUsd: number | null;
   feeUsd: number;
   timestamp: number;
   signature: string;
@@ -426,9 +428,10 @@ function buildRows(input: {
       (a, b) => rawUsdToNumber(b.sizeUsd) - rawUsdToNumber(a.sizeUsd),
     )[0];
 
-    const realizedPnlUsd = sortedTrades.reduce((sum, trade) => sum + realizedPnlForTrade(trade), 0);
+    const realizedGrossPnlUsd = sortedTrades.reduce((sum, trade) => sum + realizedPnlForTrade(trade), 0);
+    const realizedFeeUsd = realizedFeeForLeaderboard(sortedTrades, openPositions);
+    const realizedPnlUsd = realizedGrossPnlUsd - realizedFeeUsd;
     const volumeUsd = sortedTrades.reduce((sum, trade) => sum + decimalToNumber(trade.size), 0);
-    const unrealizedPnlUsd = openPositions.reduce((sum, position) => sum + rawUsdToNumber(position.pnlAfterFeesUsd), 0);
     const unrealizedGrossPnlUsd = openPositions.reduce((sum, position) => sum + rawUsdToNumber(position.pnlBeforeFeesUsd), 0);
     const openPositionValueUsd = openPositions.reduce((sum, position) => sum + rawUsdToNumber(position.valueUsd), 0);
     const openPositionNotionalUsd = openPositions.reduce((sum, position) => sum + rawUsdToNumber(position.sizeUsd), 0);
@@ -436,7 +439,9 @@ function buildRows(input: {
     const openFeeUsd = openPositions.reduce((sum, position) => sum + rawUsdToNumber(position.openFeesUsd), 0);
     const borrowFeeUsd = openPositions.reduce((sum, position) => sum + rawUsdToNumber(position.borrowFeesUsd), 0);
     const closeFeeUsd = openPositions.reduce((sum, position) => sum + rawUsdToNumber(position.closeFeesUsd), 0);
-    const feesUsd = openPositions.reduce((sum, position) => sum + rawUsdToNumber(position.totalFeesUsd), 0);
+    const openPositionFeesUsd = openPositions.reduce((sum, position) => sum + rawUsdToNumber(position.totalFeesUsd), 0);
+    const unrealizedPnlUsd = unrealizedGrossPnlUsd - openPositionFeesUsd;
+    const feesUsd = openPositionFeesUsd + realizedFeeUsd;
     const pnlUsd = realizedPnlUsd + unrealizedPnlUsd;
 
     return {
@@ -451,7 +456,7 @@ function buildRows(input: {
       errors: snapshot.errors,
       entryPriceUsd: primaryPosition ? rawUsdToNumber(primaryPosition.entryPriceUsd) : undefined,
       feesUsd,
-      grossPnlUsd: realizedPnlUsd + unrealizedGrossPnlUsd,
+      grossPnlUsd: realizedGrossPnlUsd + unrealizedGrossPnlUsd,
       leverage: primaryPosition
         ? decimalToNumber(primaryPosition.leverage) ||
           (rawUsdToNumber(primaryPosition.collateralUsd) > 0
@@ -500,11 +505,15 @@ function buildRecentActivities(tradesOldestFirst: Trade[]): TradeRecentActivity[
 
     return {
       action,
+      ...(trade.collateralUsdDelta !== undefined && trade.collateralUsdDelta !== null
+        ? { collateralUsdDelta: decimalToNumber(trade.collateralUsdDelta) }
+        : {}),
       executionPriceUsd,
       executionType: executionTypeForTrade(trade),
       feeUsd: decimalToNumber(trade.fee),
       kind: "trade",
       market,
+      netRealizedPnlUsd: netRealizedPnlForTradeOrNull(trade),
       realizedPnlUsd: realizedPnlForTradeOrNull(trade),
       side: trade.side,
       signature: trade.txHash,
@@ -561,13 +570,71 @@ function executionTypeForTrade(trade: Trade): TradeRecentActivity["executionType
   return "market";
 }
 
+function realizedFeeForLeaderboard(trades: Trade[], openPositions: Position[]): number {
+  const tradeFeeUsd = trades.reduce((sum, trade) => sum + decimalToNumber(trade.fee), 0);
+  return tradeFeeUsd - activeLifecycleIncreaseFeeUsd(trades, openPositions);
+}
+
+function activeLifecycleIncreaseFeeUsd(trades: Trade[], openPositions: Position[]): number {
+  const openPositionPubkeys = new Set(openPositions.map((position) => position.positionPubkey));
+  if (openPositionPubkeys.size === 0) return 0;
+
+  const runningSizeByPosition = new Map<string, number>();
+  const activeIncreaseFeesByPosition = new Map<string, number>();
+
+  for (const trade of sortTradesOldestFirst(trades)) {
+    const positionPubkey = trade.positionPubkey;
+    const sizeUsd = decimalToNumber(trade.size);
+    const previousSizeUsd = runningSizeByPosition.get(positionPubkey) ?? 0;
+    const changesPositionSize = sizeUsd > 0.005;
+
+    if (trade.action === "Increase") {
+      if (changesPositionSize && previousSizeUsd <= 0.005) {
+        activeIncreaseFeesByPosition.set(positionPubkey, 0);
+      }
+
+      if (changesPositionSize) {
+        activeIncreaseFeesByPosition.set(
+          positionPubkey,
+          (activeIncreaseFeesByPosition.get(positionPubkey) ?? 0) + decimalToNumber(trade.fee),
+        );
+        runningSizeByPosition.set(positionPubkey, previousSizeUsd + sizeUsd);
+      }
+      continue;
+    }
+
+    if (!changesPositionSize) continue;
+
+    const nextSizeUsd = Math.max(0, previousSizeUsd - sizeUsd);
+    runningSizeByPosition.set(positionPubkey, nextSizeUsd);
+
+    if (nextSizeUsd <= 0.005) {
+      activeIncreaseFeesByPosition.set(positionPubkey, 0);
+    }
+  }
+
+  return [...activeIncreaseFeesByPosition.entries()]
+    .filter(([positionPubkey]) => openPositionPubkeys.has(positionPubkey))
+    .reduce((sum, [, feeUsd]) => sum + feeUsd, 0);
+}
+
+function isRealizingTrade(trade: Trade): boolean {
+  return trade.action === "Decrease" || trade.orderType === "Liquidation";
+}
+
 function realizedPnlForTrade(trade: Trade): number {
   return realizedPnlForTradeOrNull(trade) ?? 0;
 }
 
 function realizedPnlForTradeOrNull(trade: Trade): number | null {
-  if (trade.action !== "Decrease" && trade.orderType !== "Liquidation") return null;
+  if (!isRealizingTrade(trade)) return null;
   return trade.pnl === null ? null : decimalToNumber(trade.pnl);
+}
+
+function netRealizedPnlForTradeOrNull(trade: Trade): number | null {
+  const realizedPnlUsd = realizedPnlForTradeOrNull(trade);
+  if (realizedPnlUsd === null) return null;
+  return realizedPnlUsd - decimalToNumber(trade.fee);
 }
 
 function sortTradesOldestFirst(trades: Trade[]): Trade[] {
@@ -671,7 +738,7 @@ function renderTerminalLeaderboard(input: {
 
   console.log(separator(width));
   console.log(
-    "Ctrl+C to stop. Net PnL = SDK trade.pnl realized + position.pnlAfterFeesUsd unrealized; Pos % is gross open PnL divided by collateral.",
+    "Ctrl+C to stop. Net PnL = trade.pnl + open gross PnL - realized fees - open position total fees; Pos % is gross open PnL divided by collateral.",
   );
   const recentDetails = formatRecentActivityDetails(input.rows);
   if (recentDetails) console.log(recentDetails);
@@ -680,7 +747,8 @@ function renderTerminalLeaderboard(input: {
 function formatRecentSummary(activity: RecentActivity | undefined): string {
   if (!activity) return "--";
   if (activity.kind === "order") return activity.summary;
-  const pnl = activity.realizedPnlUsd === null ? "--" : formatSignedUsd(activity.realizedPnlUsd);
+  const pnlUsd = activity.netRealizedPnlUsd ?? activity.realizedPnlUsd;
+  const pnl = pnlUsd === null ? "--" : formatSignedUsd(pnlUsd);
   return `${activity.action} ${activity.market} ${activity.side} ${pnl}`;
 }
 
@@ -702,7 +770,15 @@ function formatRecentActivityDetails(rows: SdkReconstructedRow[]): string {
           ].join(" ");
         }
 
-        const pnl = activity.realizedPnlUsd === null ? "--" : formatSignedUsd(activity.realizedPnlUsd);
+        const pnlUsd = activity.netRealizedPnlUsd ?? activity.realizedPnlUsd;
+        const pnl = pnlUsd === null ? "--" : formatSignedUsd(pnlUsd);
+        const isCollateralOnly = activity.action === "deposit" || activity.action === "withdraw";
+        const size = isCollateralOnly && activity.collateralUsdDelta !== undefined
+          ? `${formatSignedUsd(activity.collateralUsdDelta)} collateral`
+          : formatUsd(activity.sizeUsd);
+        const price = isCollateralOnly
+          ? "--"
+          : `${formatTokenAmount(activity.sizeToken)} @ ${formatPrice(activity.executionPriceUsd)}`;
         return [
           "  ",
           formatTime(activity.timestamp),
@@ -710,8 +786,8 @@ function formatRecentActivityDetails(rows: SdkReconstructedRow[]): string {
           pad(activity.executionType, 11, "left"),
           pad(`${activity.market} ${activity.side}`, 10, "left"),
           pad(pnl, 10, "left"),
-          pad(formatUsd(activity.sizeUsd), 10, "left"),
-          pad(`${formatTokenAmount(activity.sizeToken)} @ ${formatPrice(activity.executionPriceUsd)}`, 22, "left"),
+          pad(size, 18, "left"),
+          pad(price, 22, "left"),
           pad(`fee ${formatFeeUsd(activity.feeUsd)}`, 12, "left"),
           shortSignature(activity.signature),
         ].join(" ");

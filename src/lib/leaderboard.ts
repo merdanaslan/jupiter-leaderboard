@@ -36,6 +36,8 @@ export function createLockedSnapshot(traders: TraderScore[]): TraderScore[] {
   return traders.map((trader) => ({
     ...trader,
     recentTrade: trader.recentTrade ? { ...trader.recentTrade } : undefined,
+    recentActivity: trader.recentActivity ? { ...trader.recentActivity } : undefined,
+    recentActivities: trader.recentActivities?.map((activity) => ({ ...activity })),
     openTrade: trader.openTrade ? { ...trader.openTrade } : undefined,
   }));
 }

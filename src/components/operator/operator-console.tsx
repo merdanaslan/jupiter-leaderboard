@@ -1,8 +1,8 @@
 "use client";
 
-import { Lock, Play, RefreshCcw, Trophy } from "lucide-react";
+import { Lock, Play, RefreshCcw, Trash2, Trophy, Upload } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { CompetitionMode, MockScenario, RoundState } from "@/lib/types";
+import type { CompetitionMode, LeaderboardDataSourceId, MockScenario, RoundState } from "@/lib/types";
 import { formatTimer } from "@/lib/leaderboard";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +24,7 @@ function sameOriginPath(path: string): string {
 export function OperatorConsole() {
   const [state, setState] = useState<RoundState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importText, setImportText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [selectedFinalists, setSelectedFinalists] = useState<string[]>([]);
 
@@ -56,10 +57,31 @@ export function OperatorConsole() {
   }, []);
 
   const qualifierTraders = useMemo(
-    () =>
-      [...(state?.mockTraders ?? [])]
-        .filter((trader) => trader.mode === "qualifier")
-        .sort((a, b) => a.rank - b.rank),
+    () => {
+      if (!state) return [];
+      if (state.dataSource === "mock") {
+        return [...state.mockTraders]
+          .filter((trader) => trader.mode === "qualifier")
+          .sort((a, b) => a.rank - b.rank)
+          .map((trader) => ({
+            id: trader.id,
+            label: `#${trader.rank} ${trader.xHandle}`,
+            sublabel: trader.displayName,
+          }));
+      }
+
+      const liveRanks = new Map(
+        (state.liveStandings.qualifier ?? []).map((trader) => [trader.id, trader.rank]),
+      );
+      return state.traderConfigs
+        .filter((trader) => trader.mode === "qualifier" && trader.status === "active")
+        .sort((a, b) => (liveRanks.get(a.id) ?? 999) - (liveRanks.get(b.id) ?? 999) || a.xHandle.localeCompare(b.xHandle))
+        .map((trader) => ({
+          id: trader.id,
+          label: `${liveRanks.has(trader.id) ? `#${liveRanks.get(trader.id)} ` : ""}${trader.xHandle}`,
+          sublabel: trader.displayName,
+        }));
+    },
     [state],
   );
 
@@ -90,6 +112,11 @@ export function OperatorConsole() {
       if (current.length >= 4) return current;
       return [...current, id];
     });
+  }
+
+  async function importFile(file: File | null) {
+    if (!file) return;
+    setImportText(await file.text());
   }
 
   return (
@@ -131,6 +158,23 @@ export function OperatorConsole() {
                   >
                     <option value="qualifier">Qualifier</option>
                     <option value="final">Final</option>
+                  </select>
+                </Field>
+
+                <Field label="Data source">
+                  <select
+                    className="min-h-11 w-full rounded-md border border-border bg-background px-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    value={state?.dataSource ?? "mock"}
+                    onChange={(event) =>
+                      void sendAction({
+                        type: "setDataSource",
+                        dataSource: event.target.value as LeaderboardDataSourceId,
+                      })
+                    }
+                    disabled={isSaving}
+                  >
+                    <option value="mock">Mock data</option>
+                    <option value="jupiter-sdk">Jupiter SDK</option>
                   </select>
                 </Field>
 
@@ -182,13 +226,67 @@ export function OperatorConsole() {
                 <StatusItem label="Source" value={state?.dataSource ?? "mock"} />
                 <StatusItem label="Started" value={state?.startedAt ? "yes" : "no"} />
                 <StatusItem label="Finalists" value={String(state?.selectedFinalistIds.length ?? 0)} />
+                <StatusItem label="Configs" value={String(state?.traderConfigs.length ?? 0)} />
+                <StatusItem
+                  label="Live data"
+                  value={state ? state.liveDataStatus[state.activeMode] : "idle"}
+                />
               </dl>
+              {state?.sdkRuntime.lastError ? (
+                <p className="mt-3 rounded-md border border-danger/40 bg-danger/10 p-3 text-xs font-semibold text-danger">
+                  {state.sdkRuntime.lastError}
+                </p>
+              ) : null}
+            </Panel>
+
+            <Panel title="Trader Config">
+              <p className="mb-3 text-sm text-muted">
+                Paste CSV or JSON with id, xHandle, displayName, walletAddress, status, mode,
+                startingBalance, startingEquity, and optional avatarUrl.
+              </p>
+              <textarea
+                className="min-h-40 w-full rounded-md border border-border bg-background p-3 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                value={importText}
+                onChange={(event) => setImportText(event.target.value)}
+                placeholder="id,xHandle,displayName,walletAddress,status,mode,startingBalance,startingEquity,avatarUrl"
+              />
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-background px-4 text-sm font-black uppercase tracking-[0.14em] text-foreground transition-colors hover:bg-muted/10">
+                  <Upload className="h-4 w-4" aria-hidden />
+                  Load File
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept=".csv,.json,text/csv,application/json"
+                    onChange={(event) => void importFile(event.target.files?.[0] ?? null)}
+                  />
+                </label>
+                <ActionButton
+                  label="Import Config"
+                  onClick={() =>
+                    void sendAction({
+                      type: "importTraderConfig",
+                      contents: importText,
+                    })
+                  }
+                  disabled={isSaving || importText.trim().length === 0}
+                />
+                <ActionButton
+                  icon={<Trash2 className="h-4 w-4" aria-hidden />}
+                  label="Clear Config"
+                  onClick={() => {
+                    setImportText("");
+                    void sendAction({ type: "clearTraderConfig" });
+                  }}
+                  disabled={isSaving || (state?.traderConfigs.length ?? 0) === 0}
+                />
+              </div>
             </Panel>
           </div>
 
           <Panel title="Finalist Selection">
             <p className="mb-4 text-sm text-muted">
-              Select up to four qualifier traders for the final. Public pages only show X handles.
+              Select one to four qualifier traders for the final. Public pages only show X handles.
             </p>
             <div className="grid max-h-[520px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
               {qualifierTraders.map((trader) => {
@@ -206,7 +304,7 @@ export function OperatorConsole() {
                     )}
                   >
                     <span className="truncate">
-                      #{trader.rank} {trader.xHandle}
+                      {trader.label}
                     </span>
                     {selected ? <Trophy className="h-4 w-4 flex-none" aria-hidden /> : null}
                   </button>
@@ -222,7 +320,11 @@ export function OperatorConsole() {
                     finalistIds: selectedFinalists,
                   })
                 }
-                disabled={isSaving || selectedFinalists.length !== 4}
+                disabled={
+                  isSaving ||
+                  selectedFinalists.length === 0 ||
+                  selectedFinalists.length > 4
+                }
               />
             </div>
           </Panel>

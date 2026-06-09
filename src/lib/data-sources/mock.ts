@@ -108,7 +108,25 @@ export function createInitialRoundState(now = new Date("2026-05-23T12:00:00.000Z
       qualifier: null,
       final: null,
     },
+    liveStandings: {
+      qualifier: null,
+      final: null,
+    },
+    liveDataUpdatedAt: {
+      qualifier: null,
+      final: null,
+    },
+    liveDataStatus: {
+      qualifier: "idle",
+      final: "idle",
+    },
     mockTraders: rankMockTraders(MOCK_HANDLES.map((_, index) => baseQualifierTrader(index, now))),
+    traderConfigs: [],
+    sdkRuntime: {
+      lastError: null,
+      orderActivitiesByWallet: {},
+      orderSnapshotsByWallet: {},
+    },
     dataSource: "mock",
   };
 }
@@ -222,6 +240,18 @@ export function resetRound(state: RoundState, mode: CompetitionMode): RoundState
     lockedStandings: {
       ...state.lockedStandings,
       [mode]: null,
+    },
+    liveStandings: {
+      ...state.liveStandings,
+      [mode]: null,
+    },
+    liveDataUpdatedAt: {
+      ...state.liveDataUpdatedAt,
+      [mode]: null,
+    },
+    liveDataStatus: {
+      ...state.liveDataStatus,
+      [mode]: "idle",
     },
   };
 

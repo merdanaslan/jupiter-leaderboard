@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import type { PublicTraderScore } from "@/lib/types";
 
 export function FinalDisplay() {
-  const { data, isLoading, error } = useLeaderboard("final");
+  const { data, isLoading, error } = useLeaderboard("final", 2_000);
   const traders = data?.traders ?? [];
   const winner = data?.state.status === "locked" || data?.state.status === "final";
 

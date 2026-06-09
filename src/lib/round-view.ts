@@ -3,7 +3,14 @@ import { durationForMode } from "./round-durations";
 import type { CompetitionMode, PublicRoundState, RoundState } from "./types";
 
 export function publicRoundStateForMode(state: RoundState, mode: CompetitionMode): PublicRoundState {
-  const { mockTraders: _mockTraders, lockedStandings, ...basePublicState } = state;
+  const {
+    liveStandings: _liveStandings,
+    mockTraders: _mockTraders,
+    sdkRuntime: _sdkRuntime,
+    traderConfigs: _traderConfigs,
+    lockedStandings,
+    ...basePublicState
+  } = state;
   const publicLockedStandings = {
     qualifier: lockedStandings.qualifier ? publicLeaderboardView(lockedStandings.qualifier) : null,
     final: lockedStandings.final ? publicLeaderboardView(lockedStandings.final) : null,

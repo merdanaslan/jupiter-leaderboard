@@ -1,15 +1,15 @@
 # Solana Summit Germany Trading Cup Leaderboard
 
-Mock-data-first leaderboard for the Solana Summit Germany Trading Cup powered by Jupiter Perps.
+Live leaderboard for the Solana Summit Germany Trading Cup powered by Jupiter Perps.
 
 The public leaderboard never requires wallet connection and must not expose participant wallet addresses.
 
 ## Routes
 
-- `/qualifier`: public read-only qualifier leaderboard with 25 mock traders, timer, Top 4 Zone, and locked standings.
-- `/final`: public read-only final display with 4 finalist cards, large PnL, gap to leader, and winner state after lock.
+- `/qualifier`: public read-only qualifier leaderboard with timer, Top 4 Zone, dynamic rankings, and locked standings.
+- `/final`: public read-only final display with 4 finalist rows, large PnL, recent activity, and winner state after lock.
 - `/display`: public read-only display that follows the active operator mode.
-- `/operator`: protected event controls for mode, start, lock, reset, mock scenarios, and finalist selection.
+- `/operator`: protected event controls for mode, data source, start, lock, reset, mock scenarios, trader config import, and finalist selection.
 
 ## Local Setup
 
@@ -20,11 +20,61 @@ npm run dev
 ```
 
 The operator route uses HTTP Basic Auth. The username can be any value; the password must match `OPERATOR_PASSWORD`.
-Put local RPC endpoints and the operator password in `.env.local`. Put real test wallets in `config/test-wallets.local.txt`, one owner wallet per line. Both files are ignored and should not be committed.
+Put local RPC/API endpoints and the operator password in `.env.local`. Put real test wallets in `config/test-wallets.local.txt`, one owner wallet per line. Both files are ignored and should not be committed.
+
+## Event Operation
+
+Use `/operator` for event control:
+
+1. Import trader config as CSV or JSON.
+2. Choose `Mock data` for rehearsal or `Jupiter SDK` for live Jupiter Perps data.
+3. Set mode to `Qualifier` or `Final`.
+4. Press `Start` when the round begins.
+5. Press `Lock` manually if needed, or let the timer reach zero. The public leaderboard freezes from the latest cached standings.
+6. After qualifier lock, select the four finalists in `/operator`, switch to `Final`, and start the final round.
+
+Trader config fields:
+
+```csv
+id,xHandle,displayName,walletAddress,status,mode,startingBalance,startingEquity,avatarUrl
+q-01,@trader,Trader Name,11111111111111111111111111111111,active,qualifier,100,100,/avatars/trader.png
+```
+
+Use `mode=qualifier` for qualifier wallets. You may either import explicit `mode=final` rows for final wallets, or select the finalists from qualifier rows; selected finalists are promoted to final mode with 1,000 starting equity unless explicit final rows exist. `avatarUrl` is optional and should point at a committed public asset or stable hosted image.
 
 ## Persistence
 
-V1 state is stored in `storage/leaderboard-state.json` through an abstract state-store interface and atomic local-file writes. The `storage/` directory is ignored so local event state is not committed. The store can later be replaced with Redis, Supabase, Postgres, or another hosted persistence layer.
+By default, local state is stored in `storage/leaderboard-state.json` through an abstract state-store interface and atomic local-file writes. The `storage/` directory is ignored so local event state is not committed.
+
+For Vercel, configure Supabase so all serverless invocations share the same state/cache:
+
+```bash
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+LEADERBOARD_STATE_ID=default
+LEADERBOARD_STATE_TABLE=leaderboard_state
+```
+
+Apply `supabase/migrations/0001_leaderboard_state.sql` to create the minimal JSON state table. The app uses the service-role key only on server routes; do not expose it to client code. Set `LEADERBOARD_STATE_STORE=local` to force local JSON state during local development even when Supabase env vars exist.
+
+## Active Data Source
+
+The production-friendly live path is `Jupiter SDK` in `/operator`. It uses `jupiter-perps-api-sdk` read endpoints to reconstruct the round leaderboard from whitelisted wallets:
+
+- open positions for live unrealized PnL, equity contribution, collateral, leverage, fees, and TP/SL requests
+- round trades since `startedAt` for realized PnL, notional volume, and recent activity
+- active limit orders for limit-order state and derived place/cancel activity
+
+Polling cadence defaults:
+
+```bash
+QUALIFIER_REFRESH_MS=5000
+FINAL_REFRESH_MS=2500
+LEADERBOARD_RECENT_LIMIT=8
+PERPS_SDK_API_URL=https://perps-api.jup.ag/v1
+```
+
+Public pages poll the app API; the app API refreshes the SDK cache only when stale. This keeps viewer devices from seeing wallet addresses and gives Vercel deployments a shared cache when Supabase is configured.
 
 ## Real Data Adapter
 
@@ -242,17 +292,17 @@ The SDK reconstruction table shows rank, trader, net PnL, cup %, open-position %
 
 Use a fixed `START_TS` for competition tests. If omitted, the script uses a rolling `now - --since-minutes` window, which is useful for inspection but not correct for an official round.
 
-This path is Vercel-friendly because it uses normal HTTP reads, but it makes per-wallet calls. For 25 qualifier wallets, expect one positions request plus one or more paged trades requests per wallet per poll. The script fetches trades in pages and marks a wallet partial if the round has more trades than `--trade-limit * --max-trade-pages`. It should be treated as Plan B until rate limits and 25-wallet latency are rehearsed with Jupiter.
+This path is Vercel-friendly because it uses normal HTTP reads, but it makes per-wallet calls. For 25 qualifier wallets, expect one positions request plus one or more paged trades requests per wallet per poll. The script fetches trades in pages and marks a wallet partial if the round has more trades than `--trade-limit * --max-trade-pages`. This is the current primary app data source, but 25-wallet latency and rate limits should still be rehearsed before the event.
 
 For the public qualifier/final leaderboards, the SDK reconstruction path covers the required fields: rank, trader display name from local config, PnL, PnL %, equity, notional volume, final gap-to-leader, current open position data, and recent activity. Timer, lock/freeze behavior, selected finalists, and Top 4 display rules remain app state/UI concerns.
 
 Known SDK reconstruction limits:
 
 - It does not call the dedicated competition endpoint, so it reconstructs round state from per-wallet position and trade reads.
-- Filled trigger trades are exposed as `Trigger`; without an explicit TP/SL field in the SDK trade payload, the UI should label them as trigger executions rather than claiming exact TP vs SL after fill.
+- Filled TP/SL trades are exposed as trigger executions. The adapter suppresses nearby synthetic TP/SL cancel activity when a trigger fill removes the order, so the recent feed does not imply the trader manually canceled a filled TP/SL.
 - Active TP/SL requests are available from open positions, and active limit orders are available only when `--include-limit-orders` is used. TP/SL and limit-order create/cancel recent activity is derived from polling state changes, so it starts after the first observed poll and is approximate to the poll timestamp.
 - Trade rows include timestamps and transaction hashes but not Solana slots.
-- `trade.pnl` fee semantics should still be confirmed with Jupiter before making the SDK reconstruction path official for prize settlement.
+- `trade.pnl` fee semantics should still be confirmed with Jupiter before final prize settlement rules are locked.
 
 The operator SSE watch endpoint can use the same gRPC-backed tracker with `transport=solstream`, for example `/api/operator/jupiter-perps/watch?transport=solstream&walletAddresses=<WALLET>&includeOraclePrices=true`. Solstream watch defaults to `signatureLimit=0` unless explicitly provided, so a provider without transaction-history RPC can still stream live round data from `fromSlot`.
 

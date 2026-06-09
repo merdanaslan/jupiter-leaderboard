@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   getFinalCelebrationEvent,
   getQualifierCelebrationEvent,
+  getRoundEndCelebrationDelayMs,
   isCelebrationCooldownReady,
 } from "./summit-celebration-events";
 import { createSummitMockLeaderboardPayload } from "./summit-live-leaderboard";
@@ -61,5 +62,32 @@ describe("summit celebration events", () => {
     expect(isCelebrationCooldownReady({ lastTriggeredAt: null, now: 1_000, cooldownMs: 3_000 })).toBe(true);
     expect(isCelebrationCooldownReady({ lastTriggeredAt: 1_000, now: 3_999, cooldownMs: 3_000 })).toBe(false);
     expect(isCelebrationCooldownReady({ lastTriggeredAt: 1_000, now: 4_000, cooldownMs: 3_000 })).toBe(true);
+  });
+
+  it("schedules round-end cannon fire from the live round timer", () => {
+    expect(
+      getRoundEndCelebrationDelayMs({
+        durationSeconds: 30,
+        nowMs: Date.parse("2026-06-07T09:00:20.000Z"),
+        startedAt: "2026-06-07T09:00:00.000Z",
+        status: "live",
+      }),
+    ).toBe(10_000);
+    expect(
+      getRoundEndCelebrationDelayMs({
+        durationSeconds: 30,
+        nowMs: Date.parse("2026-06-07T09:00:31.000Z"),
+        startedAt: "2026-06-07T09:00:00.000Z",
+        status: "live",
+      }),
+    ).toBe(0);
+    expect(
+      getRoundEndCelebrationDelayMs({
+        durationSeconds: 30,
+        nowMs: Date.parse("2026-06-07T09:00:20.000Z"),
+        startedAt: "2026-06-07T09:00:00.000Z",
+        status: "locked",
+      }),
+    ).toBeNull();
   });
 });

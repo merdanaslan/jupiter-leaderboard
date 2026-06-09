@@ -1,0 +1,74 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - img "Solana Summit Germany" [ref=e6]
+      - generic [ref=e7]:
+        - heading "Trading Cup" [level=1] [ref=e8]
+        - generic [ref=e10]:
+          - generic [ref=e11]: Powered by
+          - img "Jupiter" [ref=e12]
+      - timer "Final timer" [ref=e13]:
+        - generic [ref=e14]: Final time left
+        - generic [ref=e15]: 30:00
+    - generic [ref=e16]:
+      - generic [ref=e19]:
+        - generic [ref=e20]: 🔥
+        - heading "Final Showdown" [level=2] [ref=e21]
+        - generic [ref=e22]: 🔥
+      - generic [ref=e24]:
+        - generic [ref=e25]: Rank
+        - generic [ref=e26]: Trader / X handle
+        - generic [ref=e27]: Net PnL USD
+        - generic [ref=e28]: PnL %
+        - generic [ref=e29]: Equity
+        - generic [ref=e30]: Volume
+        - generic [ref=e31]: Recent activity
+      - list "Final leaderboard" [ref=e32]:
+        - listitem "1st place, @merdan" [ref=e33]:
+          - generic [ref=e34]: "#1"
+          - generic [ref=e35]:
+            - generic [ref=e36]: MA
+            - generic [ref=e37]:
+              - heading "@merdan" [level=3] [ref=e38]
+              - paragraph [ref=e39]: Merdan
+          - paragraph [ref=e40]: +$435.00
+          - paragraph [ref=e41]: +43.5%
+          - paragraph [ref=e42]: $1,435.00
+          - paragraph [ref=e43]: $63.6K
+          - generic [ref=e44]: "--"
+        - listitem "2nd place, @solape" [ref=e45]:
+          - generic [ref=e46]: "#2"
+          - generic [ref=e47]:
+            - generic [ref=e48]: SA
+            - generic [ref=e49]:
+              - heading "@solape" [level=3] [ref=e50]
+              - paragraph [ref=e51]: Sol Ape
+          - paragraph [ref=e52]: +$428.00
+          - paragraph [ref=e53]: +42.8%
+          - paragraph [ref=e54]: $1,428.00
+          - paragraph [ref=e55]: $59.2K
+          - generic [ref=e56]: "--"
+        - listitem "3rd place, @juptrader" [ref=e57]:
+          - generic [ref=e58]: "#3"
+          - generic [ref=e59]:
+            - generic [ref=e60]: JT
+            - generic [ref=e61]:
+              - heading "@juptrader" [level=3] [ref=e62]
+              - paragraph [ref=e63]: Jup Trader
+          - paragraph [ref=e64]: +$414.00
+          - paragraph [ref=e65]: +41.4%
+          - paragraph [ref=e66]: $1,414.00
+          - paragraph [ref=e67]: $54.8K
+          - generic [ref=e68]: "--"
+        - listitem "4th place, @berlinbull" [ref=e69]:
+          - generic [ref=e70]: "#4"
+          - generic [ref=e71]:
+            - generic [ref=e72]: BB
+            - generic [ref=e73]:
+              - heading "@berlinbull" [level=3] [ref=e74]
+              - paragraph [ref=e75]: Berlin Bull
+          - paragraph [ref=e76]: +$387.00
+          - paragraph [ref=e77]: +38.7%
+          - paragraph [ref=e78]: $1,387.00
+          - paragraph [ref=e79]: $50.6K
+          - generic [ref=e80]: "--"
