@@ -8,6 +8,7 @@ The public leaderboard never requires wallet connection and must not expose part
 
 - `/qualifier`: public read-only qualifier leaderboard with timer, Top 4 Zone, dynamic rankings, and locked standings.
 - `/final`: public read-only final display with 4 finalist rows, large PnL, recent activity, and winner state after lock.
+- `/timer/qualifier` and `/timer/final`: public full-screen timer-only displays for separate venue screens.
 - `/display`: public read-only display that follows the active operator mode.
 - `/operator`: protected event controls for mode, data source, start, lock, reset, mock scenarios, trader config import, and finalist selection.
 
